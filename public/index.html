@@ -460,7 +460,7 @@ async function loadSection(a, s, i, t) {
 
 // every section the sheet has, read off the sheet itself
 async function listSections(a) {
-  const shape = tabs => tabs.map(tab => ({ id: "g" + tab.gid, name: tab.name, gid: tab.gid, param: "gid=" + tab.gid + "&name=" + encodeURIComponent(tab.name) }));
+  const shape = tabs => tabs.filter(tab => !/social/i.test(tab.name)).map(tab => ({ id: "g" + tab.gid, name: tab.name, gid: tab.gid, param: "gid=" + tab.gid + "&name=" + encodeURIComponent(tab.name) }));
   const cached = LS.get("tabs." + a.key, null);
 
   const fetching = fetch(API + "/tabs?" + reqArtist(a))

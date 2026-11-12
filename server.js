@@ -1875,6 +1875,8 @@ function listTabs(artist) {
 
     while ((found = pattern.exec(html))) {
       const name = unescapeJsString(found[1]).replace(/\s+/g, " ").trim();
+      // an artist's social media tab (Triller, Fortnite...) is not a tracker
+      if (/social|socials/i.test(name)) continue;
       if (!tabs.some(tab => tab.gid === found[2])) tabs.push({ gid: found[2], name: name || "Tab " + (tabs.length + 1) });
     }
 
