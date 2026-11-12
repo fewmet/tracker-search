@@ -136,13 +136,13 @@
   .m { font-size: 13px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
   .m span { overflow: hidden; text-overflow: ellipsis; }
   .n { font-size: 12.5px; color: var(--label-2); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
-  mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+  mark { background: none; color: var(--tint); }
   .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--gray); }
   .dot.g { background: var(--green); } .dot.o { background: var(--orange); } .dot.y { background: var(--yellow); } .dot.r { background: var(--red); }
   .rr { flex: none; font-size: 14px; color: var(--label-2); font-variant-numeric: tabular-nums; }
   .chev { flex: none; width: 8px; height: 13px; color: var(--label-3); }
   .check { flex: none; width: 15px; height: 15px; color: var(--tint); }
-  .thumb { flex: none; width: 44px; height: 44px; border-radius: 7px; position: relative; overflow: hidden; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: hsl(var(--h, 210) 38% 46%); letter-spacing: .02em; }
+  .thumb { flex: none; width: 44px; height: 44px; border-radius: 7px; position: relative; overflow: hidden; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: var(--label-2); background: var(--fill-2); letter-spacing: .02em; }
   .thumb.round { border-radius: 50%; }
   .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .thumb.ic { background: var(--fill); color: var(--tint); }
@@ -218,6 +218,24 @@
   .bigbtn { width: 100%; height: 50px; border-radius: 12px; background: var(--tint); color: #fff; font-weight: 600; text-align: center; }
   .bigbtn:disabled { opacity: .5; }
   .bigbtn:active { opacity: .8; }
+  .t small { font-size: 14px; font-weight: 400; color: var(--label-2); margin-left: 6px; }
+  .row { min-height: 56px; } .row .body { min-height: 56px; }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 12px; padding: 0 16px; }
+  .card { min-width: 0; display: block; }
+  .card:active { opacity: .6; }
+  .card .thumb { width: 100%; height: auto; aspect-ratio: 1; border-radius: 10px; font-size: 20px; }
+  .card .t { font-size: 13px; margin-top: 6px; }
+  .card .s { font-size: 12px; margin-top: 0; }
+  .chip b { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #fff; color: var(--tint); font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+  .opts { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px; }
+  .opt { height: 34px; padding: 0 14px; border-radius: 17px; background: var(--cell); font-size: 15px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .opt.on { background: var(--tint); color: #fff; }
+  .switch { flex: none; width: 51px; height: 31px; border-radius: 16px; background: var(--fill-2); position: relative; transition: background .2s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(0,0,0,.2); transition: transform .2s; }
+  .switch.on { background: var(--green); }
+  .switch.on::after { transform: translateX(20px); }
+  .hero h2 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .hero h2.long { font-size: 17px; }
 </style>
 </head>
 <body>
@@ -385,8 +403,9 @@ function buildRows(t, a) {
         q1: firstLine(r.quality), a1: firstLine(r.available), t1: firstLine(r.type)
       });
       // a row from a section that is not a song list: its cells stand in for notes
+      if (r.g && m.title.length > 60) { m.notes = r.name; m.title = r.era || sec.name; m.sub = firstLine(r.name); }
       if (r.g && !m.sub) m.sub = (r.fields || []).slice(0, 2).map(f => firstLine(f[1])).join(" · ").slice(0, 160);
-      m.body = r.notes || (r.fields || []).map(f => f[1]).join("\n");
+      m.body = (m.notes ? m.notes + "\n" : "") + (r.fields || []).map(f => f[1]).join("\n");
       m.nameN = nameN;
       m.titleN = norm(m.title);
       m.hay = [nameN, norm(r.era), norm(r.type), norm(r.quality), norm(r.available)].join(" | ");
@@ -576,13 +595,13 @@ function paintThumbs() {
 }
 
 function rowHtml(r, i, kind) {
-  const meta = [kind === "saved" ? r.artistName : "", r.era, r.q1, r.a1, r.g ? r.tabs[0] : ""].filter(Boolean).join(" · ");
-  return `<button class="row" data-${kind || "i"}="${i}">${thumb(r)}<span class="body"><span class="rt">
-    <div class="t">${hl(r.title)}</div>
-    ${r.sub ? `<div class="s">${hl(r.sub)}</div>` : ""}
-    <div class="m"><i class="dot ${tone(r)}"></i><span>${hl(meta) || "No details"}</span></div>
-    ${r._n && kind !== "saved" ? `<div class="n">${hl(snippet(r.body || ""))}</div>` : ""}
-  </span>${r.length ? `<span class="rr">${esc(firstLine(r.length))}</span>` : ""}${ICON.chev}</span></button>`;
+  const meta = [kind === "saved" ? r.artistName : "", r.era === r.title ? "" : r.era, r.g ? r.tabs[0] : r.a1 || r.q1].filter(Boolean).join(" · ");
+  const length = firstLine(r.length);
+  return '<button class="row" data-' + (kind || "i") + '="' + i + '">' + thumb(r) + '<span class="body"><span class="rt">' +
+    '<div class="t">' + hl(r.title) + (r.sub ? "<small>" + hl(r.sub) + "</small>" : "") + "</div>" +
+    '<div class="m">' + (r.g ? "" : '<i class="dot ' + tone(r) + '"></i>') + "<span>" + (esc(meta) || "No details") + "</span></div>" +
+    (r._n && kind !== "saved" ? '<div class="n">' + hl(snippet(r.body || "")) + "</div>" : "") +
+    "</span>" + (length && !/^n\/?a$/i.test(length) ? '<span class="rr">' + esc(length) + "</span>" : "") + ICON.chev + "</span></button>";
 }
 
 function skeleton() {
@@ -636,10 +655,12 @@ function refresh(keepScroll) {
         state.recents.map((q, i) => '<button class="row" data-recent="' + i + '"><span class="thumb ic" style="width:30px;height:30px;background:none">' + ICON.clock + '</span><span class="body"><span class="rt"><div class="t" style="font-weight:400">' + esc(q) + "</div></span></span></button>").join("") + "</div>";
     }
 
-    // every section of the sheet, in the sheet's own order
+    // every section of the sheet, in the sheet's own order; the first few until asked
     if (t.sections.length > 1) {
-      html += '<div class="sec-h"><span>Sections</span><span>' + num(t.sections.length) + "</span></div>" + '<div class="group plain">' +
-        t.sections.map((sec, i) => {
+      const many = t.sections.length > 7;
+      const open = state.allSecs || !many;
+      html += '<div class="sec-h"><span>Sections</span>' + (many ? '<button id="toggleSecs">' + (open ? "Show Less" : "Show All " + t.sections.length) + "</button>" : "") + '</div><div class="group plain">' +
+        t.sections.slice(0, open ? t.sections.length : 6).map((sec, i) => {
           const part = t.parts[i];
           const count = part ? num(part.rows.length) : t.done < t.total ? "…" : "–";
           return '<button class="row" data-sec="' + i + '" style="padding-left:16px"><span class="body"><span class="rt"><div class="t" style="font-weight:400">' + esc(sec.name) + '</div></span><span class="rr">' + count + "</span>" + ICON.chev + "</span></button>";
@@ -648,8 +669,9 @@ function refresh(keepScroll) {
 
     const eras = eraList(rows);
     if (eras.length) {
-      html += '<div class="sec-h"><span>Eras</span><span>' + num(eras.length) + '</span></div><div class="group">' +
-        eras.map(e => '<button class="row" data-era="' + esc(e.value) + '">' + thumb({ artist: state.artist, era: e.value, artistName: "" }, "era") + '<span class="body"><span class="rt"><div class="t">' + esc(e.value) + '</div><div class="s">' + num(e.count) + (e.count === 1 ? " song" : " songs") + "</div></span>" + ICON.chev + "</span></button>").join("") + "</div>";
+      html += '<div class="sec-h"><span>Eras</span></div><div class="grid">' +
+        eras.map(e => '<button class="card" data-era="' + esc(e.value) + '">' + thumb({ artist: state.artist, era: e.value, artistName: "" }, "era") +
+          '<div class="t">' + esc(e.value) + '</div><div class="s">' + num(e.count) + (e.count === 1 ? " song" : " songs") + "</div></button>").join("") + "</div>";
     }
 
     const note = progressNote();
@@ -693,9 +715,31 @@ function renderChips() {
     '<button class="chip' + (value ? " on" : "") + '" data-chip="' + key + '"><span>' + esc(value || label) + "</span>" + ICON.down + "</button>";
   let html = "";
   if (t && t.sections.length > 1) html += chip("tab", "Section", f.tab);
-  html += chip("era", "Era", f.era) + chip("avail", "Availability", f.avail) + chip("quality", "Quality", f.quality) + chip("type", "Type", f.type);
-  html += '<button class="chip' + (f.file ? " on" : "") + '" data-chip="file"><span>Has a file</span></button>';
+  const extra = [f.avail, f.quality, f.type, f.file].filter(Boolean).length;
+  html += chip("era", "Era", f.era);
+  html += '<button class="chip' + (extra ? " on" : "") + '" data-chip="more"><span>Filters</span>' + (extra ? "<b>" + extra + "</b>" : "") + "</button>";
   $("#chips").innerHTML = html;
+}
+
+// availability, quality, type and "has a file", all on one sheet
+function openFilters() {
+  const f = state.f, rows = pool();
+  const group = (key, title, field) => {
+    const counts = new Map();
+    rows.forEach(r => { if (r[field]) counts.set(r[field], (counts.get(r[field]) || 0) + 1); });
+    const options = [...counts].sort((x, y) => y[1] - x[1]).slice(0, 14).map(pair => pair[0]);
+    if (f[key] && !options.includes(f[key])) options.unshift(f[key]);
+    if (!options.length) return "";
+    return '<div class="sec-h"><span>' + title + '</span></div><div class="opts">' + options.map(value =>
+      '<button class="opt' + (f[key] === value ? " on" : "") + '" data-fkey="' + key + '" data-fval="' + esc(value) + '">' + esc(value) + "</button>").join("") + "</div>";
+  };
+
+  openSheet({
+    title: "Filters", tall: true, left: "Reset",
+    onLeft: () => { f.avail = f.quality = f.type = ""; f.file = false; refresh(); openFilters(); },
+    body: '<div class="group plain"><button class="row" data-ftoggle="1" style="padding-left:16px"><span class="body"><span class="rt"><div class="t" style="font-weight:400">Only songs with a file</div></span><span class="switch' + (f.file ? " on" : "") + '"></span></span></button></div>' +
+      group("avail", "Availability", "a1") + group("quality", "Quality", "q1") + group("type", "Type", "t1")
+  });
 }
 
 function setHeader() {
@@ -834,11 +878,11 @@ function openDetail(r) {
   const a = state.byKey[r.artist];
   const sheetLink = r.sheet ? (r.row ? `${r.sheet}&range=A${r.row}` : r.sheet) : "";
   const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return url; } };
-  const kv = [["Era", r.era], ["Type", r.type], ["Quality", r.quality], ["Available", r.available], ["Length", r.length], ["Date", r.date], ["Section", r.tabs.join(", ")], ["Tracker", r.artistName], ["Sheet row", r.row || ""]].concat(r.fields || [])
+  const kv = [["Era", r.era], ["Type", r.type], ["Quality", r.quality], ["Available", r.available], ["Length", r.length], ["Date", r.date], ["Section", r.tabs.join(", ")]].concat(r.fields || [])
     .filter(p => String(p[1] || "").trim());
 
   const body = `
-    <div class="hero">${thumb(r, "big")}<div style="min-width:0"><h2>${esc(r.title)}</h2>${r.sub ? `<p>${esc(r.sub)}</p>` : ""}<p class="era">${esc([r.artistName, r.era].filter(Boolean).join(" · "))}</p></div></div>
+    <div class="hero">${thumb(r, "big")}<div style="min-width:0"><h2${r.title.length > 60 ? ' class="long"' : ""}>${esc(r.title)}</h2>${r.sub ? `<p>${esc(r.sub)}</p>` : ""}<p class="era">${esc([r.artistName, r.era].filter(Boolean).join(" · "))}</p></div></div>
     <div class="pills">${[r.a1, r.q1, r.t1].filter(Boolean).map((p, i) => `<span class="pill">${i === 0 && r.a1 ? `<i class="dot ${tone(r)}"></i>` : ""}${esc(p)}</span>`).join("")}${r.links.length || r.g ? "" : `<span class="pill">No file</span>`}</div>
     <div class="actions">
       ${r.links.length ? `<button class="act primary" data-open="${esc(r.links[0])}">${r.play ? ICON.play + "Open File" : ICON.link + "Open Link"}</button>` : ""}
@@ -1007,7 +1051,7 @@ document.querySelector(".tabbar").addEventListener("click", e => {
 $("#chips").addEventListener("click", e => {
   const chip = e.target.closest(".chip");
   if (!chip) return;
-  if (chip.dataset.chip === "file") { state.f.file = !state.f.file; refresh(); return; }
+  if (chip.dataset.chip === "more") { openFilters(); return; }
   openPicker(chip.dataset.chip);
 });
 
@@ -1016,6 +1060,10 @@ $("#results").addEventListener("click", e => {
   if (e.target.closest("#clearRecents")) { state.recents = []; LS.set("recents", []); refresh(); return; }
   if (e.target.closest("#resetFilters")) { state.f = { tab: "", era: "", quality: "", avail: "", type: "", file: false }; refresh(); return; }
   if (e.target.closest("#retry")) { const old = trackers.get(state.artist); if (old) old.dead = true; trackers.delete(state.artist); loadTracker(state.artist); refresh(); return; }
+
+  if (e.target.closest("#toggleSecs")) { state.allSecs = !state.allSecs; refresh(true); return; }
+  const card = e.target.closest(".card");
+  if (card) { state.f.era = card.dataset.era; refresh(); return; }
 
   const row = e.target.closest(".row");
   if (!row) return;
@@ -1048,6 +1096,9 @@ $("#sheetBody").addEventListener("click", e => {
   if (open) { window.open(open.dataset.open, "_blank", "noopener"); return; }
   const cp = e.target.closest("[data-copy]");
   if (cp) { copy(cp.dataset.copy); return; }
+  const opt = e.target.closest("[data-fkey]");
+  if (opt) { const key = opt.dataset.fkey; state.f[key] = state.f[key] === opt.dataset.fval ? "" : opt.dataset.fval; refresh(); openFilters(); return; }
+  if (e.target.closest("[data-ftoggle]")) { state.f.file = !state.f.file; refresh(); openFilters(); return; }
   const gone = e.target.closest("[data-remove]");
   if (gone) { removeTracker(gone.dataset.remove); return; }
   const pick = e.target.closest("[data-pick]");
