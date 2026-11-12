@@ -431,6 +431,28 @@ function buildRows(t, a) {
       t.rows.push(m);
     });
   });
+
+  /*
+    The order eras are shown in is the Unreleased tab's own, top to bottom - the
+    order the player shows them in. Going by the rows above instead put whatever
+    tab the sheet happens to list first (Recent, Best Of...) in charge. Eras only
+    Released has follow, then those of the remaining song tabs.
+  */
+  const RELISTS = /^(recent|bestof|special|grails|wanted|highlights|notable|worstof|skeptical|fakes|key)/i;
+  const rank = sec => {
+    const known = named.find(s => (s.gid && s.gid === sec.gid) || s.key === sec.id || norm(s.name) === norm(sec.name));
+    const key = String(known ? known.key : sec.name).toLowerCase().replace(/[^a-z]/g, "");
+    return key.startsWith("unreleased") ? 0 : key.startsWith("released") ? 1 : RELISTS.test(key) ? 3 : 2;
+  };
+  const seen = new Set();
+  t.eraOrder = [];
+  t.sections.map((sec, i) => ({ sec, i })).filter(x => t.parts[x.i] && isSongs(x.sec))
+    .sort((x, y) => rank(x.sec) - rank(y.sec) || x.i - y.i)
+    .forEach(x => t.parts[x.i].rows.forEach(r => {
+      if (r.g || !r.era || seen.has(r.era)) return;
+      seen.add(r.era);
+      t.eraOrder.push(r.era);
+    }));
 }
 
 // a tracker can have thirty-odd sections; only a few are fetched at a time
@@ -516,7 +538,13 @@ async function loadCovers(key, tries = 0) {
   try {
     const data = await (await fetch(API + "/covers?artist=" + encodeURIComponent(key))).json();
     const map = data.covers || {}, low = {};
-    Object.keys(map).forEach(era => { low[era.toLowerCase().trim()] = map[era]; });
+    // the same era is spelled a little differently from tab to tab ("nettmink"
+    // and "nettmink*", "Trendi" and "Trëndi"), so it is also filed loosely
+    Object.keys(map).forEach(era => {
+      const flat = flatEra(era), loose = looseEra(era);
+      if (!(flat in low)) low[flat] = map[era];
+      if (loose && !(("~" + loose) in low)) low["~" + loose] = map[era];
+    });
     covers[key] = { map, low, pending: Boolean(data.pending) };
     paintThumbs();
     if (data.pending && tries < 10) setTimeout(() => loadCovers(key, tries + 1), 4000);
@@ -526,9 +554,16 @@ async function loadCovers(key, tries = 0) {
 function coverUrl(artist, era) {
   const c = covers[artist];
   if (!c || !era) return "";
-  const url = c.map[era] || c.low[String(era).toLowerCase().trim()] || "";
+  const url = (c.map[era] || c.low[flatEra(era)] || c.low["~" + looseEra(era)] || "").replace(OLD_APPLE_ART,
+    "https://is1-ssl.mzstatic.com/image/thumb/$1/600x600bb.jpg");
   return url && url[0] === "/" ? API + url : url;
 }
+
+const plainEra = era => String(era || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const flatEra = era => plainEra(era).replace(/\s+/g, " ").trim();
+const looseEra = era => plainEra(era).replace(/[^a-z0-9]/g, "");
+// Apple answers its old artwork addresses with a 403; the files are still on its image server
+const OLD_APPLE_ART = /^https?:\/\/a\d+\.mzstatic\.com\/(?:[a-z]{2}\/)?r\d+\/(?:\d+\/)?(Music\d*\/v4\/.+\/[^\/?#]+\.(?:jpe?g|png))$/i;
 
 let changeTimer = 0;
 function dataChanged(key) {
@@ -637,7 +672,11 @@ function eraList(rows) {
   const real = new Set();
   rows.forEach(r => { if (r.core && r.era && !r.g) real.add(r.era); });
   rows.forEach(r => { if (r.era && !r.g && (!real.size || real.has(r.era))) eras.set(r.era, (eras.get(r.era) || 0) + 1); });
-  return [...eras].map(([era, count]) => ({ value: era, count }));
+  const t = trackers.get(state.artist);
+  const order = new Map(((t && t.eraOrder) || []).map((era, i) => [era, i]));
+  const at = era => order.has(era) ? order.get(era) : Infinity;
+  return [...eras].map(([era, count]) => ({ value: era, count }))
+    .sort((x, y) => at(x.value) === at(y.value) ? 0 : at(x.value) - at(y.value));
 }
 
 function installHint() {
