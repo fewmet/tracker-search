@@ -2040,6 +2040,85 @@ async function loadTabRows(artist, section, configured, fresh) {
 }
 
 /*
+  The Key tab explains the words a tracker uses - "Snippet", "OG File", "ref."
+  and so on. It is not a list of anything, so the app shows it as a glossary
+  rather than as a section. The tab is laid out as lists side by side: a word,
+  its meaning in the next cell, then the next list's word and meaning. A word
+  with nothing beside it is the heading of the list below it.
+*/
+const KEY_TAB = /(^|[^a-z])key([^a-z]|$)/i;
+
+function keyGroups(rows) {
+  const text = cell => String(cell || "").replace(/[ 	]+/g, " ").trim();
+  const grid = (rows || []).slice(0, 400).map(row => (row || []).map(text)).filter(row => row.some(Boolean));
+  if (!grid.length) return [];
+
+  // the first row is the headings, which says which columns hold the words
+  const termColumns = grid[0].map((cell, at) => (cell ? at : -1)).filter(at => at >= 0);
+  const isTerm = at => termColumns.includes(at);
+  const open = new Map();   // column -> the list currently being filled there
+  const groups = [];
+  let last = null;
+
+  const start = (column, title) => {
+    last = { title, items: [] };
+    open.set(column, last);
+    groups.push(last);
+    return last;
+  };
+
+  grid.forEach(cells => {
+    const filled = cells.map((cell, at) => (cell ? at : -1)).filter(at => at >= 0);
+
+    // every list's column has a short word and nothing is explained: new headings
+    const headings = filled.every(isTerm) && termColumns.every(at => cells[at] && cells[at].length <= 60);
+    if (headings) { termColumns.forEach(at => start(at, cells[at])); return; }
+
+    for (let i = 0; i < cells.length; i++) {
+      if (!cells[i]) continue;
+
+      if (isTerm(i)) {
+        const meaning = !isTerm(i + 1) && cells[i + 1] ? cells[i + 1] : "";
+        (open.get(i) || start(i, "")).items.push({ term: cells[i].slice(0, 120), text: meaning.slice(0, 2000) });
+        if (meaning) i++;
+      } else {
+        // a line off on its own is a note about the list it sits under
+        const owner = open.get(termColumns.filter(at => at < i).pop()) || last || start(i, "");
+        owner.items.push({ term: "", text: cells[i].slice(0, 2000) });
+      }
+    }
+  });
+
+  return groups.filter(group => group.items.length);
+}
+
+app.get("/key", async (req, res) => {
+  try {
+    const artist = getArtist(req.query.artist, req.query.custom);
+    let gid = String(req.query.gid || "");
+
+    if (!/^d{1,12}$/.test(gid)) {
+      const tab = (await listTabs(artist)).tabs.find(item => KEY_TAB.test(item.name));
+      if (!tab) return res.json({ artist: artist.key, groups: [] });
+      gid = tab.gid;
+    }
+
+    const section = { name: "Key", gid };
+
+    // the CSV has the frozen heading row the page view leaves out
+    const csv = await readTabCsv(artist, section);
+    let groups = csv ? keyGroups(csv.rows) : [];
+    if (!groups.length) groups = keyGroups((await readSheetTab(artist, gid)).rows);
+
+    res.set("Cache-Control", "public, max-age=600");
+    res.json({ artist: artist.key, sheet: getSheetEditUrl(artist, section), groups });
+  } catch (err) {
+    console.warn("[key]", err.message || err);
+    res.status(502).json({ error: "Could not read the key." });
+  }
+});
+
+/*
   Every row of one tab, in a small shape. ?gid= reads any tab of the sheet;
   ?section= still reads one of the tabs named in artists.json.
 */
