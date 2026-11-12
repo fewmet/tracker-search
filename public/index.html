@@ -203,13 +203,21 @@
   .act.primary:active { opacity: .8; background: var(--tint); }
   .notes { margin: 0 16px; padding: 12px 14px; border-radius: 12px; background: var(--cell); font-size: 15px; line-height: 1.38; white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
   .kv .row { min-height: 44px; padding-left: 16px; } .kv .row .body { min-height: 44px; }
-  .kv .k { flex: none; font-size: 16px; }
+  .kv .k { flex: none; font-size: 16px; max-width: 45%; }
+  .kv .row .body { padding-top: 10px; padding-bottom: 10px; align-items: flex-start; }
   .kv .v { flex: 1; min-width: 0; text-align: right; color: var(--label-2); font-size: 16px; -webkit-user-select: text; user-select: text; word-break: break-word; }
   .lnk .t { color: var(--tint); font-weight: 400; }
   .lnk .copy { flex: none; color: var(--tint); font-size: 15px; padding: 8px 2px 8px 10px; }
 
   .toast { position: absolute; left: 50%; bottom: calc(70px + var(--safe-b)); z-index: 20; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .25s; background: rgba(50,50,54,.94); color: #fff; font-size: 15px; font-weight: 500; padding: 10px 16px; border-radius: 22px; white-space: nowrap; }
   .toast.on { opacity: 1; transform: translate(-50%, 0); }
+  .form .row { padding-left: 16px; min-height: 46px; } .form .row .body { min-height: 46px; }
+  .form .k { flex: none; width: 62px; font-size: 16px; }
+  .form input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font-size: 16px; padding: 0; -webkit-user-select: text; user-select: text; }
+  .form input::placeholder { color: var(--label-3); }
+  .bigbtn { width: 100%; height: 50px; border-radius: 12px; background: var(--tint); color: #fff; font-weight: 600; text-align: center; }
+  .bigbtn:disabled { opacity: .5; }
+  .bigbtn:active { opacity: .8; }
 </style>
 </head>
 <body>
@@ -332,7 +340,7 @@ const ICON = {
 /* ---------------------------------------------------------------- state */
 const state = {
   artists: [], byKey: {}, photos: {},
-  artist: LS.get("artist", ""), all: false,
+  artist: LS.get("artist", ""), customs: LS.get("customs", []),
   q: "", f: { tab: "", era: "", quality: "", avail: "", type: "", file: false },
   recents: LS.get("recents", []),
   saved: LS.get("saved", [])
@@ -342,38 +350,47 @@ const covers = {};            // artist key -> { map, low }
 let view = [], shown = 0, tokens = [], sheetRows = null;
 
 /* ---------------------------------------------------------------- loading */
+const b64url = text => btoa(unescape(encodeURIComponent(text))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+// how a tracker is named to the server; one you added yourself carries its sheet
+const reqArtist = a => "artist=" + encodeURIComponent(a.key) +
+  (a.custom ? "&custom=" + b64url(JSON.stringify({ name: a.name, sheetId: a.sheetId })) : "");
+
 function buildRows(t, a) {
   const by = new Map();
   t.rows = [];
 
   t.parts.forEach((part, i) => {
     if (!part) return;
-    const sec = a.sections[i];
+    const sec = t.sections[i];
 
-    part.rows.forEach(r => {
+    part.rows.forEach((r, at) => {
       const nameN = norm(r.name);
       const links = r.links || [];
-      const k = nameN + "|" + (links[0] || norm(r.era));
+      const k = r.g ? sec.id + "|" + at + "|" + nameN : nameN + "|" + (links[0] || norm(r.era));
       const had = by.get(k);
 
-      // Best Of, Special, Recent and Grails re-list songs: one row, several tabs
+      // plenty of sections re-list the same songs: one row, several sections
       if (had) {
         if (!had.tabs.includes(sec.name)) had.tabs.push(sec.name);
-        if (!had.notes && r.notes) { had.notes = r.notes; had.notesN = norm(r.notes); }
+        if (!had.notes && r.notes) { had.notes = r.notes; had.body = r.notes; had.notesN = norm(r.notes); }
         return;
       }
 
       const lines = String(r.name).split("\n").map(x => x.trim()).filter(Boolean);
       const m = Object.assign({}, r, {
-        links, artist: a.key, artistName: a.name, tabs: [sec.name], sec: sec.key, sheet: part.sheet || "",
+        links, artist: a.key, artistName: a.name, tabs: [sec.name], gid: sec.gid || "", sheet: part.sheet || "",
         id: a.key + "|" + k,
         title: lines[0] || r.name, sub: lines.slice(1).join(" "),
         q1: firstLine(r.quality), a1: firstLine(r.available), t1: firstLine(r.type)
       });
+      // a row from a section that is not a song list: its cells stand in for notes
+      if (r.g && !m.sub) m.sub = (r.fields || []).slice(0, 2).map(f => firstLine(f[1])).join(" · ").slice(0, 160);
+      m.body = r.notes || (r.fields || []).map(f => f[1]).join("\n");
       m.nameN = nameN;
       m.titleN = norm(m.title);
-      m.hay = [nameN, norm(r.era), norm(r.type), norm(r.quality), norm(r.available), norm(a.name)].join(" | ");
-      m.notesN = norm(r.notes);
+      m.hay = [nameN, norm(r.era), norm(r.type), norm(r.quality), norm(r.available)].join(" | ");
+      m.notesN = norm(m.body);
 
       by.set(k, m);
       t.rows.push(m);
@@ -381,8 +398,14 @@ function buildRows(t, a) {
   });
 }
 
+// a tracker can have thirty-odd sections; only a few are fetched at a time
+let running = 0;
+const waiting = [];
+function takeSlot() { if (running < 4) { running++; return Promise.resolve(); } return new Promise(res => waiting.push(res)); }
+function freeSlot() { const next = waiting.shift(); if (next) next(); else running--; }
+
 async function loadSection(a, s, i, t) {
-  const cacheKey = a.key + "|" + s.key;
+  const cacheKey = a.key + "|" + s.id;
   const cached = await idb.get(cacheKey);
   let have = false;
 
@@ -392,8 +415,10 @@ async function loadSection(a, s, i, t) {
   }
 
   if (!cached || Date.now() - cached.at > 10 * 60 * 1000) {
+    await takeSlot();
     try {
-      const res = await fetch(`${API}/tracker-rows?artist=${encodeURIComponent(a.key)}&section=${encodeURIComponent(s.key)}`);
+      if (t.dead) return;
+      const res = await fetch(API + "/tracker-rows?" + reqArtist(a) + "&" + s.param);
       if (!res.ok) throw new Error(res.status);
       const data = await res.json();
 
@@ -405,6 +430,8 @@ async function loadSection(a, s, i, t) {
       }
     } catch (err) {
       if (!have) t.failed++;
+    } finally {
+      freeSlot();
     }
   }
 
@@ -412,21 +439,42 @@ async function loadSection(a, s, i, t) {
   dataChanged(a.key);
 }
 
+// every section the sheet has, read off the sheet itself
+async function listSections(a) {
+  const shape = tabs => tabs.map(tab => ({ id: "g" + tab.gid, name: tab.name, gid: tab.gid, param: "gid=" + tab.gid + "&name=" + encodeURIComponent(tab.name) }));
+  const cached = LS.get("tabs." + a.key, null);
+
+  const fetching = fetch(API + "/tabs?" + reqArtist(a))
+    .then(res => { if (!res.ok) throw new Error(res.status); return res.json(); })
+    .then(data => { if (!data.tabs || !data.tabs.length) throw new Error("none"); LS.set("tabs." + a.key, data.tabs); return data.tabs; });
+
+  if (cached && cached.length) { fetching.catch(() => {}); return shape(cached); }
+
+  try { return shape(await fetching); }
+  catch (err) {
+    return (a.sections || []).map(sec => ({ id: sec.key, name: sec.name, gid: "", param: "section=" + encodeURIComponent(sec.key) }));
+  }
+}
+
 function loadTracker(key) {
   let t = trackers.get(key);
   if (t) return t.promise;
 
   const a = state.byKey[key];
-  t = { parts: [], rows: [], done: 0, total: a.sections.length, failed: 0 };
+  t = { parts: [], rows: [], sections: [], listed: false, done: 0, total: 0, failed: 0 };
   trackers.set(key, t);
-  t.promise = Promise.all(a.sections.map((s, i) => loadSection(a, s, i, t))).then(() => t);
+  t.promise = listSections(a).then(sections => {
+    t.sections = sections; t.total = sections.length; t.listed = true;
+    dataChanged(key);
+    return Promise.all(sections.map((sec, i) => loadSection(a, sec, i, t)));
+  }).then(() => t);
   return t.promise;
 }
 
 async function loadCovers(key, tries = 0) {
   if (covers[key] && !covers[key].pending) return;
   try {
-    const data = await (await fetch(`${API}/covers?artist=${encodeURIComponent(key)}`)).json();
+    const data = await (await fetch(API + "/covers?artist=" + encodeURIComponent(key))).json();
     const map = data.covers || {}, low = {};
     Object.keys(map).forEach(era => { low[era.toLowerCase().trim()] = map[era]; });
     covers[key] = { map, low, pending: Boolean(data.pending) };
@@ -442,28 +490,17 @@ function coverUrl(artist, era) {
   return url && url[0] === "/" ? API + url : url;
 }
 
-let allQueue = null;
-function loadEverything() {
-  if (allQueue) return;
-  const keys = state.artists.map(a => a.key);
-  let next = 0;
-  const worker = async () => { while (next < keys.length) await loadTracker(keys[next++]); };
-  allQueue = Promise.all([worker(), worker(), worker()]);
-}
-
 let changeTimer = 0;
 function dataChanged(key) {
-  if (!state.all && key !== state.artist) return;
+  if (key !== state.artist) return;
   clearTimeout(changeTimer);
   changeTimer = setTimeout(() => refresh(true), 60);
 }
 
 /* ---------------------------------------------------------------- searching */
 function pool() {
-  if (!state.all) { const t = trackers.get(state.artist); return t ? t.rows : []; }
-  const out = [];
-  state.artists.forEach(a => { const t = trackers.get(a.key); if (t) for (const r of t.rows) out.push(r); });
-  return out;
+  const t = trackers.get(state.artist);
+  return t ? t.rows : [];
 }
 
 function compute() {
@@ -522,10 +559,12 @@ function tone(r) {
 
 /* ---------------------------------------------------------------- rendering */
 function thumb(r, cls) {
-  const img = state.all && !cls ? state.photos[r.artist] : coverUrl(r.artist, r.era);
-  const label = r.era || r.artistName;
-  return `<span class="thumb ${cls || ""}${state.all && !cls ? " round" : ""}" style="--h:${hue(label)}" data-a="${esc(r.artist)}" data-e="${esc(r.era)}">${esc(initials(label))}${
-    img ? `<img loading="lazy" decoding="async" alt="" src="${esc(img)}" onerror="this.remove()">` : ""}</span>`;
+  const a = state.byKey[r.artist];
+  // a picture sitting in the row itself (art, tattoos, jewelry) beats the era's cover
+  const img = r.img != null && a && r.gid ? API + "/row-image?" + reqArtist(a) + "&gid=" + r.gid + "&i=" + r.img : coverUrl(r.artist, r.era);
+  const label = r.era || (r.tabs && r.tabs[0]) || r.artistName;
+  return '<span class="thumb ' + (cls || "") + '" style="--h:' + hue(label) + '" data-a="' + esc(r.artist) + '" data-e="' + esc(r.era) + '">' + esc(initials(label)) +
+    (img ? '<img loading="lazy" decoding="async" alt="" src="' + esc(img) + '" onerror="this.remove()">' : "") + "</span>";
 }
 
 function paintThumbs() {
@@ -537,12 +576,12 @@ function paintThumbs() {
 }
 
 function rowHtml(r, i, kind) {
-  const meta = [state.all || kind === "saved" ? r.artistName : "", r.era, r.q1, r.a1].filter(Boolean).join(" · ");
+  const meta = [kind === "saved" ? r.artistName : "", r.era, r.q1, r.a1, r.g ? r.tabs[0] : ""].filter(Boolean).join(" · ");
   return `<button class="row" data-${kind || "i"}="${i}">${thumb(r)}<span class="body"><span class="rt">
     <div class="t">${hl(r.title)}</div>
     ${r.sub ? `<div class="s">${hl(r.sub)}</div>` : ""}
     <div class="m"><i class="dot ${tone(r)}"></i><span>${hl(meta) || "No details"}</span></div>
-    ${r._n && kind !== "saved" ? `<div class="n">${hl(snippet(r.notes))}</div>` : ""}
+    ${r._n && kind !== "saved" ? `<div class="n">${hl(snippet(r.body || ""))}</div>` : ""}
   </span>${r.length ? `<span class="rr">${esc(firstLine(r.length))}</span>` : ""}${ICON.chev}</span></button>`;
 }
 
@@ -554,7 +593,7 @@ function skeleton() {
 
 function eraList(rows) {
   const eras = new Map();
-  rows.forEach(r => { if (r.era) eras.set(r.era, (eras.get(r.era) || 0) + 1); });
+  rows.forEach(r => { if (r.era && !r.g) eras.set(r.era, (eras.get(r.era) || 0) + 1); });
   return [...eras].map(([era, count]) => ({ value: era, count }));
 }
 
@@ -566,12 +605,8 @@ function installHint() {
 }
 
 function progressNote() {
-  if (state.all) {
-    const done = state.artists.filter(a => { const t = trackers.get(a.key); return t && t.done >= t.total; }).length;
-    return done < state.artists.length ? `Loading trackers… ${done} of ${state.artists.length}` : "";
-  }
   const t = trackers.get(state.artist);
-  return t && t.done < t.total ? `Loading tabs… ${t.done} of ${t.total}` : "";
+  return t && t.listed && t.done < t.total ? "Loading sections… " + t.done + " of " + t.total : "";
 }
 
 function refresh(keepScroll) {
@@ -584,10 +619,10 @@ function refresh(keepScroll) {
   renderChips();
 
   if (!rows.length) {
-    const loading = state.all ? progressNote() : !t || t.done < t.total;
-    if (loading) box.innerHTML = skeleton();
-    else box.innerHTML = `<div class="empty">${ICON.search}<h2>Couldn't Load Tracker</h2><p>${
-      t && t.failed ? "The tracker didn't answer. Check your connection and try again." : "This tracker has no songs listed."}</p><button id="retry">Try Again</button></div>`;
+    if (!t || !t.listed || t.done < t.total) box.innerHTML = skeleton();
+    else box.innerHTML = '<div class="empty">' + ICON.search + "<h2>Couldn't Load Tracker</h2><p>" +
+      (t.failed || !t.total ? "The sheet didn't answer. Check your connection, and that anyone with the link can view it." : "This tracker has nothing listed.") +
+      '</p><button id="retry">Try Again</button></div>';
     return;
   }
 
@@ -597,21 +632,28 @@ function refresh(keepScroll) {
     let html = installHint();
 
     if (state.recents.length) {
-      html += `<div class="sec-h"><span>Recent</span><button id="clearRecents">Clear</button></div><div class="group plain">` +
-        state.recents.map((q, i) => `<button class="row" data-recent="${i}"><span class="thumb ic" style="width:30px;height:30px;background:none">${ICON.clock}</span><span class="body"><span class="rt"><div class="t" style="font-weight:400">${esc(q)}</div></span></span></button>`).join("") + `</div>`;
+      html += '<div class="sec-h"><span>Recent</span><button id="clearRecents">Clear</button></div><div class="group plain">' +
+        state.recents.map((q, i) => '<button class="row" data-recent="' + i + '"><span class="thumb ic" style="width:30px;height:30px;background:none">' + ICON.clock + '</span><span class="body"><span class="rt"><div class="t" style="font-weight:400">' + esc(q) + "</div></span></span></button>").join("") + "</div>";
     }
 
-    if (state.all) {
-      html += `<div class="empty">${ICON.search}<h2>Search Every Tracker</h2><p>${num(rows.length)} songs across ${trackers.size} trackers so far.</p></div>`;
-    } else {
-      const eras = eraList(rows);
-      html += `<div class="sec-h"><span>Eras</span><span>${num(rows.length)} songs</span></div><div class="group">` +
-        eras.map(e => `<button class="row" data-era="${esc(e.value)}">${thumb({ artist: state.artist, era: e.value, artistName: "" }, "era")}<span class="body"><span class="rt"><div class="t">${esc(e.value)}</div><div class="s">${num(e.count)} ${e.count === 1 ? "song" : "songs"}</div></span>${ICON.chev}</span></button>`).join("") + `</div>`;
-      if (!eras.length) html += `<div class="note">This tracker doesn't group its songs into eras. Type to search.</div>`;
+    // every section of the sheet, in the sheet's own order
+    if (t.sections.length > 1) {
+      html += '<div class="sec-h"><span>Sections</span><span>' + num(t.sections.length) + "</span></div>" + '<div class="group plain">' +
+        t.sections.map((sec, i) => {
+          const part = t.parts[i];
+          const count = part ? num(part.rows.length) : t.done < t.total ? "…" : "–";
+          return '<button class="row" data-sec="' + i + '" style="padding-left:16px"><span class="body"><span class="rt"><div class="t" style="font-weight:400">' + esc(sec.name) + '</div></span><span class="rr">' + count + "</span>" + ICON.chev + "</span></button>";
+        }).join("") + "</div>";
+    }
+
+    const eras = eraList(rows);
+    if (eras.length) {
+      html += '<div class="sec-h"><span>Eras</span><span>' + num(eras.length) + '</span></div><div class="group">' +
+        eras.map(e => '<button class="row" data-era="' + esc(e.value) + '">' + thumb({ artist: state.artist, era: e.value, artistName: "" }, "era") + '<span class="body"><span class="rt"><div class="t">' + esc(e.value) + '</div><div class="s">' + num(e.count) + (e.count === 1 ? " song" : " songs") + "</div></span>" + ICON.chev + "</span></button>").join("") + "</div>";
     }
 
     const note = progressNote();
-    if (note) html += `<div class="note">${note}</div>`;
+    if (note) html += '<div class="note">' + note + "</div>";
     box.innerHTML = html;
     if (!keepScroll) scroller.scrollTop = 0;
     return;
@@ -622,12 +664,15 @@ function refresh(keepScroll) {
 
   if (!view.length) {
     const note = progressNote();
-    box.innerHTML = `<div class="empty">${ICON.search}<h2>No Results</h2><p>${note || (state.q.trim() ? `Nothing matches “${esc(state.q.trim())}”${filtered ? " with these filters" : ""}.` : "Nothing matches these filters.")}</p>${filtered ? `<button id="resetFilters">Clear Filters</button>` : ""}</div>`;
+    box.innerHTML = '<div class="empty">' + ICON.search + "<h2>No Results</h2><p>" +
+      (note || (state.q.trim() ? "Nothing matches “" + esc(state.q.trim()) + "”" + (filtered ? " with these filters." : ".") : "Nothing matches these filters.")) + "</p>" +
+      (filtered ? '<button id="resetFilters">Clear Filters</button>' : "") + "</div>";
     return;
   }
 
   const note = progressNote();
-  box.innerHTML = `<div class="sec-h"><span>${num(view.length)} ${view.length === 1 ? "result" : "results"}</span>${note ? `<span>${note}</span>` : ""}</div><div class="group" id="list"></div><div id="more" style="height:1px"></div>`;
+  box.innerHTML = '<div class="sec-h"><span>' + num(view.length) + (view.length === 1 ? " result" : " results") + "</span>" + (note ? "<span>" + note + "</span>" : "") +
+    '</div><div class="group" id="list"></div><div id="more" style="height:1px"></div>';
   appendRows(keepShown);
   if (!keepScroll) scroller.scrollTop = 0;
 }
@@ -643,25 +688,23 @@ function appendRows(count) {
 }
 
 function renderChips() {
-  const f = state.f, a = state.byKey[state.artist];
+  const f = state.f, t = trackers.get(state.artist);
   const chip = (key, label, value) =>
-    `<button class="chip${value ? " on" : ""}" data-chip="${key}"><span>${esc(value || label)}</span>${ICON.down}</button>`;
+    '<button class="chip' + (value ? " on" : "") + '" data-chip="' + key + '"><span>' + esc(value || label) + "</span>" + ICON.down + "</button>";
   let html = "";
-  if (!state.all && a && a.sections.length > 1) html += chip("tab", "Tab", f.tab);
-  if (!state.all) html += chip("era", "Era", f.era);
-  html += chip("avail", "Availability", f.avail) + chip("quality", "Quality", f.quality) + chip("type", "Type", f.type);
-  html += `<button class="chip${f.file ? " on" : ""}" data-chip="file"><span>Has a file</span></button>`;
+  if (t && t.sections.length > 1) html += chip("tab", "Section", f.tab);
+  html += chip("era", "Era", f.era) + chip("avail", "Availability", f.avail) + chip("quality", "Quality", f.quality) + chip("type", "Type", f.type);
+  html += '<button class="chip' + (f.file ? " on" : "") + '" data-chip="file"><span>Has a file</span></button>';
   $("#chips").innerHTML = html;
 }
 
 function setHeader() {
   const a = state.byKey[state.artist];
-  const name = state.all ? "All Trackers" : a ? a.name : "Tracker Search";
+  const name = a ? a.name : "Tracker Search";
   $("#bigTitle").textContent = name;
   $("#navTitle").textContent = name;
-  const photo = !state.all && state.photos[state.artist];
-  $("#avatarBtn").innerHTML = state.all ? `<span style="width:20px;height:20px;display:grid;color:var(--tint)">${ICON.globe}</span>`
-    : photo ? `<img alt="" src="${esc(photo)}" onerror="this.remove()">` : esc(initials(name));
+  const photo = state.photos[state.artist];
+  $("#avatarBtn").innerHTML = photo ? '<img alt="" src="' + esc(photo) + '" onerror="this.remove()">' : esc(initials(name));
 }
 
 function renderArtists() {
@@ -670,15 +713,90 @@ function renderArtists() {
   let html = "";
 
   if (!qn) {
-    html += `<div class="group" style="margin-bottom:22px"><button class="row" data-artist="*"><span class="thumb ic round">${ICON.globe}</span><span class="body"><span class="rt"><div class="t">All Trackers</div><div class="s">Search every artist at once</div></span>${state.all ? ICON.check : ""}</span></button></div>`;
+    html += '<div class="group" style="margin-bottom:22px"><button class="row" data-artist="+"><span class="thumb ic round"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 4v12M4 10h12"/></svg></span><span class="body"><span class="rt"><div class="t">Add Your Own Tracker</div><div class="s">Any tracker on Google Sheets' +
+      (state.customs.length ? " · " + state.customs.length + " added" : "") + "</div></span>" + ICON.chev + "</span></button></div>";
   }
 
-  html += list.length ? `<div class="group">` + list.map(a => {
+  html += list.length ? '<div class="group">' + list.map(a => {
     const photo = state.photos[a.key];
-    return `<button class="row" data-artist="${esc(a.key)}"><span class="thumb round" style="--h:${hue(a.name)}">${esc(initials(a.name))}${photo ? `<img loading="lazy" alt="" src="${esc(photo)}" onerror="this.remove()">` : ""}</span><span class="body"><span class="rt"><div class="t">${esc(a.name)}</div><div class="s">${esc(a.sections.map(s => s.name).join(" · "))}</div></span>${!state.all && a.key === state.artist ? ICON.check : ICON.chev}</span></button>`;
-  }).join("") + `</div>` : `<div class="empty"><h2>No Artist Found</h2><p>That artist doesn't have a tracker here yet.</p></div>`;
+    const tabs = LS.get("tabs." + a.key, null);
+    const sub = [a.custom ? "Added by you" : "", tabs ? tabs.length + (tabs.length === 1 ? " section" : " sections") : ""].filter(Boolean).join(" · ");
+    return '<button class="row" data-artist="' + esc(a.key) + '"><span class="thumb round" style="--h:' + hue(a.name) + '">' + esc(initials(a.name)) +
+      (photo ? '<img loading="lazy" alt="" src="' + esc(photo) + '" onerror="this.remove()">' : "") + '</span><span class="body"><span class="rt"><div class="t">' + esc(a.name) + "</div>" +
+      (sub ? '<div class="s">' + esc(sub) + "</div>" : "") + "</span>" + (a.key === state.artist ? ICON.check : ICON.chev) + "</span></button>";
+  }).join("") + "</div>" : '<div class="empty"><h2>No Artist Found</h2><p>Not here yet. You can add any Google Sheets tracker yourself.</p></div>';
 
   $("#artistList").innerHTML = html;
+}
+
+/* ---------------------------------------------------------------- your own trackers */
+function openAdd() {
+  const mine = state.customs;
+  openSheet({
+    title: "Add Tracker", tall: true,
+    body: '<div class="note" style="padding-top:0;padding-bottom:12px">Paste the link to any tracker on Google Sheets. It has to be viewable by anyone with the link. It is saved on this device only.</div>' +
+      '<div class="group form">' +
+      '<label class="row"><span class="body"><span class="k">Link</span><input id="addUrl" type="url" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="docs.google.com/spreadsheets/d/…"></span></label>' +
+      '<label class="row"><span class="body"><span class="k">Name</span><input id="addName" type="text" maxlength="60" autocomplete="off" placeholder="Optional"></span></label>' +
+      "</div>" +
+      '<div class="note" id="addErr" style="color:var(--red)" hidden></div>' +
+      '<div style="padding:16px"><button class="bigbtn" id="addGo">Add Tracker</button></div>' +
+      (mine.length ? '<div class="sec-h"><span>Your Trackers</span></div><div class="group plain lnk">' + mine.map(a =>
+        '<div class="row" style="padding-left:16px"><span class="body"><span class="rt"><div class="t" style="color:var(--label)">' + esc(a.name) + '</div></span><button class="copy" style="color:var(--red)" data-remove="' + esc(a.key) + '">Remove</button></span></div>').join("") + "</div>" : "")
+  });
+  $("#addGo").onclick = addTracker;
+}
+
+async function addTracker() {
+  const url = $("#addUrl").value.trim(), name = $("#addName").value.trim();
+  const btn = $("#addGo"), box = $("#addErr");
+  const fail = text => { box.textContent = text; box.hidden = false; btn.disabled = false; btn.textContent = "Add Tracker"; };
+  const found = /\/spreadsheets\/d\/([A-Za-z0-9_-]{20,100})/.exec(url) || /^([A-Za-z0-9_-]{20,100})$/.exec(url);
+
+  if (!found) return fail("That doesn't look like a Google Sheets link. Copy it from the address bar or the Share button of the sheet.");
+
+  const already = state.customs.find(a => a.sheetId === found[1]);
+  if (already) { closeSheet(); selectArtist(already.key); showTab("search"); return; }
+
+  box.hidden = true; btn.disabled = true; btn.textContent = "Checking…";
+
+  let key = "c_";
+  for (let i = 0; i < 10; i++) key += "abcdefghijklmnopqrstuvwxyz0123456789"[Math.floor(Math.random() * 36)];
+  const a = { key, name: name || "My tracker", sheetId: found[1], custom: true, sections: [] };
+
+  try {
+    const res = await fetch(API + "/tabs?" + reqArtist(a));
+    if (!res.ok) throw new Error(res.status);
+    const data = await res.json();
+    if (!data.tabs || !data.tabs.length) throw new Error("none");
+    if (!name && data.title) a.name = data.title.slice(0, 60);
+    LS.set("tabs." + a.key, data.tabs);
+  } catch (err) {
+    return fail("Couldn't read that sheet. Make sure it is shared so anyone with the link can view it.");
+  }
+
+  state.customs.unshift(a);
+  LS.set("customs", state.customs);
+  state.artists.unshift(a);
+  state.byKey[a.key] = a;
+  closeSheet();
+  selectArtist(a.key);
+  showTab("search");
+  toast("Tracker added");
+}
+
+function removeTracker(key) {
+  state.customs = state.customs.filter(a => a.key !== key);
+  LS.set("customs", state.customs);
+  state.artists = state.artists.filter(a => a.key !== key);
+  delete state.byKey[key];
+  const t = trackers.get(key);
+  if (t) { t.dead = true; trackers.delete(key); }
+  try { localStorage.removeItem("ts.tabs." + key); } catch (e) {}
+  if (state.artist === key) selectArtist((state.artists.find(a => !a.custom) || state.artists[0] || {}).key);
+  else renderArtists();
+  openAdd();
+  toast("Removed");
 }
 
 function renderSaved() {
@@ -714,14 +832,14 @@ function isSaved(r) { return state.saved.some(s => s.id === r.id); }
 
 function openDetail(r) {
   const a = state.byKey[r.artist];
-  const sheetLink = r.sheet ? `${r.sheet}&range=A${r.row}` : "";
+  const sheetLink = r.sheet ? (r.row ? `${r.sheet}&range=A${r.row}` : r.sheet) : "";
   const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return url; } };
-  const kv = [["Era", r.era], ["Type", r.type], ["Quality", r.quality], ["Available", r.available], ["Length", r.length], ["Date", r.date], ["Tab", r.tabs.join(", ")], ["Tracker", r.artistName], ["Sheet row", r.row]]
+  const kv = [["Era", r.era], ["Type", r.type], ["Quality", r.quality], ["Available", r.available], ["Length", r.length], ["Date", r.date], ["Section", r.tabs.join(", ")], ["Tracker", r.artistName], ["Sheet row", r.row || ""]].concat(r.fields || [])
     .filter(p => String(p[1] || "").trim());
 
   const body = `
     <div class="hero">${thumb(r, "big")}<div style="min-width:0"><h2>${esc(r.title)}</h2>${r.sub ? `<p>${esc(r.sub)}</p>` : ""}<p class="era">${esc([r.artistName, r.era].filter(Boolean).join(" · "))}</p></div></div>
-    <div class="pills">${[r.a1, r.q1, r.t1].filter(Boolean).map((p, i) => `<span class="pill">${i === 0 && r.a1 ? `<i class="dot ${tone(r)}"></i>` : ""}${esc(p)}</span>`).join("")}${r.links.length ? "" : `<span class="pill">No file</span>`}</div>
+    <div class="pills">${[r.a1, r.q1, r.t1].filter(Boolean).map((p, i) => `<span class="pill">${i === 0 && r.a1 ? `<i class="dot ${tone(r)}"></i>` : ""}${esc(p)}</span>`).join("")}${r.links.length || r.g ? "" : `<span class="pill">No file</span>`}</div>
     <div class="actions">
       ${r.links.length ? `<button class="act primary" data-open="${esc(r.links[0])}">${r.play ? ICON.play + "Open File" : ICON.link + "Open Link"}</button>` : ""}
       <button class="act" id="saveBtn">${isSaved(r) ? ICON.starOn + "Saved" : ICON.star + "Save"}</button>
@@ -731,7 +849,7 @@ function openDetail(r) {
     ${r.notes ? `<div class="sec-h"><span>Notes</span></div><div class="notes">${hl(r.notes)}</div>` : ""}
     ${r.links.length ? `<div class="sec-h"><span>${r.links.length === 1 ? "Link" : "Links"}</span></div><div class="group plain lnk">${r.links.map(l => `<div class="row" style="padding-left:16px"><span class="body"><button class="rt" data-open="${esc(l)}"><div class="t">${esc(host(l))}</div><div class="s">${esc(l.replace(/^https?:\/\//, ""))}</div></button><button class="copy" data-copy="${esc(l)}">Copy</button></span></div>`).join("")}</div>` : ""}
     <div class="sec-h"><span>Details</span></div>
-    <div class="group kv">${kv.map(p => `<div class="row"><span class="body"><span class="k">${p[0]}</span><span class="v">${esc(String(p[1]).replace(/\n+/g, " · "))}</span></span></div>`).join("")}</div>`;
+    <div class="group kv">${kv.map(p => `<div class="row"><span class="body">${p[0] ? `<span class="k">${esc(p[0])}</span>` : ""}<span class="v"${p[0] ? "" : ' style="text-align:left"'}>${esc(String(p[1]).replace(/\n+/g, " · "))}</span></span></div>`).join("")}</div>`;
 
   openSheet({ title: "", body, tall: true });
 
@@ -739,7 +857,7 @@ function openDetail(r) {
     if (isSaved(r)) state.saved = state.saved.filter(s => s.id !== r.id);
     else {
       const keep = {};
-      ["id", "artist", "artistName", "era", "name", "title", "sub", "notes", "length", "type", "quality", "available", "date", "links", "row", "play", "tabs", "sec", "sheet", "q1", "a1", "t1"].forEach(k => { keep[k] = r[k]; });
+      ["id", "artist", "artistName", "era", "name", "title", "sub", "notes", "length", "type", "quality", "available", "date", "links", "row", "play", "tabs", "gid", "sheet", "q1", "a1", "t1", "g", "fields", "img", "body"].forEach(k => { keep[k] = r[k]; });
       state.saved.unshift(keep);
     }
     LS.set("saved", state.saved);
@@ -755,17 +873,17 @@ function openDetail(r) {
     copy(url);
   };
 
-  if (a) loadCovers(r.artist);
+  if (a && !a.custom) loadCovers(r.artist);
 }
 
 function openPicker(key) {
-  const f = state.f, rows = pool(), a = state.byKey[state.artist];
-  const titles = { tab: "Tab", era: "Era", avail: "Availability", quality: "Quality", type: "Type" };
+  const f = state.f, rows = pool(), t = trackers.get(state.artist);
+  const titles = { tab: "Section", era: "Era", avail: "Availability", quality: "Quality", type: "Type" };
   const field = { avail: "a1", quality: "q1", type: "t1" }[key];
   let options;
 
   if (key === "tab") {
-    options = a.sections.map(s => ({ value: s.name, count: rows.filter(r => r.tabs.includes(s.name)).length }));
+    options = (t ? t.sections : []).map(s => ({ value: s.name, count: rows.filter(r => r.tabs.includes(s.name)).length }));
   } else if (key === "era") {
     options = eraList(rows);
   } else {
@@ -813,9 +931,9 @@ async function copy(text) {
 
 /* ---------------------------------------------------------------- actions */
 function selectArtist(key, opts = {}) {
-  state.all = key === "*";
-  if (!state.all) { state.artist = key; LS.set("artist", key); }
-  LS.set("all", state.all);
+  if (!state.byKey[key]) return;
+  state.artist = key;
+  LS.set("artist", key);
   state.f = { tab: "", era: "", quality: "", avail: "", type: "", file: state.f.file };
   if (!opts.keepQuery) { state.q = ""; $("#q").value = ""; $("#clearQ").hidden = true; }
 
@@ -823,15 +941,15 @@ function selectArtist(key, opts = {}) {
   renderArtists();
   syncUrl();
 
-  if (state.all) loadEverything();
-  else { loadTracker(key); loadCovers(key); }
+  loadTracker(key);
+  if (!state.byKey[key].custom) loadCovers(key);
   refresh();
 }
 
 function syncUrl() {
   try {
     const url = new URL(location.href);
-    url.searchParams.set("artist", state.all ? "all" : state.artist);
+    url.searchParams.set("artist", state.artist);
     state.q.trim() ? url.searchParams.set("q", state.q.trim()) : url.searchParams.delete("q");
     history.replaceState(null, "", url);
   } catch (e) {}
@@ -897,12 +1015,13 @@ $("#results").addEventListener("click", e => {
   if (e.target.closest("#hintX")) { LS.set("hint", true); $("#hint").remove(); return; }
   if (e.target.closest("#clearRecents")) { state.recents = []; LS.set("recents", []); refresh(); return; }
   if (e.target.closest("#resetFilters")) { state.f = { tab: "", era: "", quality: "", avail: "", type: "", file: false }; refresh(); return; }
-  if (e.target.closest("#retry")) { trackers.delete(state.artist); loadTracker(state.artist); refresh(); return; }
+  if (e.target.closest("#retry")) { const old = trackers.get(state.artist); if (old) old.dead = true; trackers.delete(state.artist); loadTracker(state.artist); refresh(); return; }
 
   const row = e.target.closest(".row");
   if (!row) return;
   if (row.dataset.i) { remember(); openDetail(view[Number(row.dataset.i)]); }
   else if (row.dataset.era != null) { state.f.era = row.dataset.era; refresh(); }
+  else if (row.dataset.sec) { const t = trackers.get(state.artist); state.f.tab = t.sections[Number(row.dataset.sec)].name; refresh(); }
   else if (row.dataset.recent) {
     state.q = state.recents[Number(row.dataset.recent)] || "";
     $("#q").value = state.q; $("#clearQ").hidden = !state.q;
@@ -913,6 +1032,7 @@ $("#results").addEventListener("click", e => {
 $("#artistList").addEventListener("click", e => {
   const row = e.target.closest(".row");
   if (!row) return;
+  if (row.dataset.artist === "+") { openAdd(); return; }
   $("#artistQ").value = "";
   selectArtist(row.dataset.artist);
   showTab("search");
@@ -928,6 +1048,8 @@ $("#sheetBody").addEventListener("click", e => {
   if (open) { window.open(open.dataset.open, "_blank", "noopener"); return; }
   const cp = e.target.closest("[data-copy]");
   if (cp) { copy(cp.dataset.copy); return; }
+  const gone = e.target.closest("[data-remove]");
+  if (gone) { removeTracker(gone.dataset.remove); return; }
   const pick = e.target.closest("[data-pick]");
   if (pick) {
     const i = Number(pick.dataset.pick);
@@ -967,18 +1089,17 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetOpen)
     const data = cachedList || await fetching;
     if (cachedList) fetching.catch(() => {});
 
-    state.artists = data.artists || [];
+    state.artists = state.customs.concat(data.artists || []);
     state.artists.forEach(a => { state.byKey[a.key] = a; });
 
     const params = new URLSearchParams(location.search);
     const asked = (params.get("artist") || "").toLowerCase();
     const q = params.get("q") || "";
-    const wantAll = asked === "all" || (!asked && LS.get("all", false));
     if (!state.byKey[state.artist]) state.artist = data.defaultArtist && state.byKey[data.defaultArtist] ? data.defaultArtist : (state.artists[0] || {}).key;
     if (state.byKey[asked]) state.artist = asked;
 
     if (q) { state.q = q; $("#q").value = q; $("#clearQ").hidden = false; $("#v-search").classList.add("searching"); }
-    selectArtist(wantAll ? "*" : state.artist, { keepQuery: true });
+    selectArtist(state.artist, { keepQuery: true });
   } catch (err) {
     $("#bigTitle").textContent = "Tracker Search";
     $("#results").innerHTML = `<div class="empty">${ICON.search}<h2>Can't Reach Trackers</h2><p>Check your connection and try again.</p><button onclick="location.reload()">Try Again</button></div>`;
@@ -991,7 +1112,6 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetOpen)
     state.photos = data.photos || {};
     LS.set("photos", state.photos);
     setHeader(); renderArtists();
-    if (state.all) refresh(true);
   }).catch(() => {});
 })();
 </script>

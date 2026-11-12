@@ -405,7 +405,7 @@ function parseCustomArtist(artistKey, custom) {
         gid: String(section.gid)
       }));
 
-    if (!sections.length) return null;
+    if (!sections.length) sections.push({ key: "tab1", name: "Tab 1", gid: "0" });
 
     const artist = normaliseArtistEntry({
       key,
@@ -1840,22 +1840,254 @@ async function loadSongsCached(artist, section, fresh = false) {
   small shape. It rides on the same cache as /songs, so it costs Google nothing
   extra when the player has already loaded that tab.
 */
+/*
+  Every tab a tracker has, not just the handful named in artists.json. Google's
+  page view of a sheet (and a mirror site's front page) lists each tab with its
+  name and number, so that list is read straight off it.
+*/
+const tabListCache = new Map();   // sheet -> { at, value } or { reading }
+const TAB_LIST_TTL_MS = 30 * 60 * 1000;
+
+function unescapeJsString(text) {
+  return String(text || "")
+    .replace(/\\x([0-9a-f]{2})/gi, (whole, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\u([0-9a-f]{4})/gi, (whole, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/\\(.)/g, "$1");
+}
+
+function listTabs(artist) {
+  const url = artist.site
+    ? artist.site + "/"
+    : "https://docs.google.com/spreadsheets/d/" + artist.sheetId + "/htmlview";
+  const held = tabListCache.get(url);
+
+  if (held && held.reading) return held.reading;
+  if (held && Date.now() - held.at < TAB_LIST_TTL_MS) return Promise.resolve(held.value);
+
+  const reading = (async () => {
+    const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!response.ok) throw new Error("sheet answered " + response.status);
+
+    const html = await response.text();
+    const tabs = [];
+    const pattern = /items\.push\(\{name: "((?:[^"\\]|\\.)*)"[^}]*?gid: "(\d+)"/g;
+    let found;
+
+    while ((found = pattern.exec(html))) {
+      const name = unescapeJsString(found[1]).replace(/\s+/g, " ").trim();
+      if (!tabs.some(tab => tab.gid === found[2])) tabs.push({ gid: found[2], name: name || "Tab " + (tabs.length + 1) });
+    }
+
+    if (!tabs.length) throw new Error("no tabs listed");
+
+    const title = decodeHtml((html.match(/<title>([^<]*)<\/title>/i) || [])[1] || "")
+      .replace(/\s*-\s*Google (Sheets|Drive|Docs)\s*$/i, "").trim();
+
+    return { tabs, title };
+  })().then(
+    value => {
+      tabListCache.set(url, { at: Date.now(), value });
+      if (tabListCache.size > 300) tabListCache.delete(tabListCache.keys().next().value);
+      return value;
+    },
+    err => { tabListCache.delete(url); throw err; });
+
+  tabListCache.set(url, { reading });
+  return reading;
+}
+
+app.get("/tabs", async (req, res) => {
+  const artist = getArtist(req.query.artist, req.query.custom);
+
+  try {
+    const listed = await listTabs(artist);
+    res.set("Cache-Control", "public, max-age=300");
+    res.json({ artist: artist.key, title: listed.title, tabs: listed.tabs });
+  } catch (err) {
+    console.warn("[tabs] " + artist.key + ":", err.message || err);
+    if (artist.custom) return res.status(502).json({ error: "Could not read that sheet." });
+
+    // the tabs named in artists.json are better than nothing
+    res.json({
+      artist: artist.key, title: "",
+      tabs: Object.values(artist.sections).map(section => ({ gid: section.gid, name: section.name }))
+    });
+  }
+});
+
+/*
+  A tab that is not a list of songs - Art, Tattoos, Interviews, Fundraisers and
+  so on. Nothing is assumed about its columns: the first row that reads like
+  headings names them, a row holding a single cell is a heading for the rows
+  under it, and every other row comes back as a title plus its labelled cells.
+*/
+function genericRows(grid, given) {
+  const rows = grid.rows || [];
+  const linkRows = grid.linkRows || [];
+  const images = grid.imageRows || [];
+  const clean = row => (row || []).map(cell => String(cell || "").trim());
+  const label = cell => String(cell || "").split("\n")[0].replace(/\s+/g, " ").trim();
+
+  let headers = (given || []).map(label);
+  let headerAt = -1;
+
+  // no headings handed in: take the first row that reads like some
+  if (!headers.filter(Boolean).length) {
+    headers = [];
+
+    for (let i = 0; i < Math.min(rows.length, 10); i++) {
+      const cells = clean(rows[i]).filter(Boolean);
+      const wordy = cells.every(cell => cell.length <= 40 && !/\d/.test(cell));
+      if (cells.length >= 2 && wordy && new Set(cells).size === cells.length) { headerAt = i; headers = clean(rows[i]).map(label); break; }
+    }
+  }
+
+  const width = headers.filter(Boolean).length;
+  const headingLine = headers.join("|").toLowerCase();
+  const eraColumn = headers.findIndex(text => /^(rel\.? ?)?era$/i.test(text));
+  const titleColumn = headers.findIndex(text => /^(name|title|song|track|item|file|video|main content|description)/i.test(text));
+  const out = [];
+  let group = "";
+
+  for (let i = headerAt + 1; i < rows.length && out.length < 6000; i++) {
+    const cells = clean(rows[i]);
+    const filled = cells.map((cell, at) => (cell ? at : -1)).filter(at => at >= 0);
+    if (!filled.length) continue;
+
+    // the heading row itself, where the page view does show it
+    if (width && cells.map(label).join("|").toLowerCase() === headingLine) continue;
+
+    const links = [];
+    (linkRows[i] || []).forEach(cell => extractLinks(cell).forEach(link => {
+      if (!links.includes(link)) links.push(link);
+    }));
+
+    if (filled.length === 1 && width >= 3 && !links.length && !images[i] && cells[filled[0]].length <= 120) {
+      group = label(cells[filled[0]]).slice(0, 80);
+      continue;
+    }
+
+    const afterEra = filled.find(at => at !== eraColumn);
+    const titleAt = titleColumn >= 0 && cells[titleColumn] ? titleColumn : afterEra != null ? afterEra : filled[0];
+
+    out.push({
+      era: eraColumn >= 0 && cells[eraColumn] && titleAt !== eraColumn ? label(cells[eraColumn]).slice(0, 80) : group,
+      name: cells[titleAt].slice(0, 400), notes: "", length: "", type: "", quality: "",
+      available: "", date: "", links: links.slice(0, 12), row: 0, play: false, g: 1,
+      fields: filled.filter(at => at !== titleAt && at !== eraColumn)
+        .map(at => [headers[at] || "", cells[at].slice(0, 3000)])
+        .filter(field => !/^https?:\/\/\S+$/.test(field[1])),
+      img: images[i] ? i : undefined
+    });
+  }
+
+  return out;
+}
+
+/*
+  The page view of a tab leaves out frozen rows, and the column headings are
+  nearly always frozen - so the headings come from the CSV export, which has
+  them. The CSV is also all there is for a tab the page view cannot draw.
+*/
+async function readTabCsv(artist, section) {
+  if (artist.site) return null;
+
+  try {
+    const response = await fetch(getSheetCsvUrl(artist, section), { headers: { "User-Agent": "Mozilla/5.0" } });
+    if (!response.ok) return null;
+
+    const rows = parse(await response.text(), { skip_empty_lines: true, relax_column_count: true });
+    const headerAt = rows.slice(0, 5).findIndex(row => row.filter(cell => String(cell || "").trim()).length >= 2);
+
+    return { rows, headers: headerAt >= 0 ? rows[headerAt] : [] };
+  } catch (err) {
+    return null;
+  }
+}
+
+// the tabs artists.json names are song lists for certain; any other tab is one
+// only if its headings say so
+async function loadTabRows(artist, section, configured, fresh) {
+  let grid = null;
+
+  try {
+    grid = await readSheetTab(artist, section.gid);
+  } catch (err) {
+    // some tabs have no table in the page view; the CSV below may still have them
+  }
+
+  let songLike = configured;
+
+  if (!songLike && grid) {
+    const header = grid.rows[findHeaderRow(grid.rows)] || [];
+    songLike = findColumn(header, "name") >= 0 && findColumn(header, "link") >= 0;
+  }
+
+  if (songLike) {
+    try {
+      const songs = await loadSongsCached(artist, section, fresh);
+      if (songs.everything && songs.everything.length) return songs.everything;
+    } catch (err) {
+      if (!grid) throw err;
+    }
+  }
+
+  const csv = await readTabCsv(artist, section);
+  if (grid) return genericRows(grid, csv ? csv.headers : null);
+  if (csv && csv.rows.length) return genericRows({ rows: csv.rows, linkRows: csv.rows, imageRows: [] }, csv.headers);
+
+  throw new Error("could not read the " + section.name + " tab");
+}
+
+/*
+  Every row of one tab, in a small shape. ?gid= reads any tab of the sheet;
+  ?section= still reads one of the tabs named in artists.json.
+*/
 app.get("/tracker-rows", async (req, res) => {
   try {
     const artist = getArtist(req.query.artist, req.query.custom);
-    const section = getSection(artist, req.query.section);
-    const songs = await loadSongsCached(artist, section, Boolean(req.query.fresh));
+    const gid = String(req.query.gid || "");
+    const fresh = Boolean(req.query.fresh);
+    let section, rows;
+
+    if (/^\d{1,12}$/.test(gid)) {
+      const known = artist.custom ? null : Object.values(artist.sections).find(item => item.gid === gid);
+      section = known || { name: String(req.query.name || "Tab").slice(0, 80), gid };
+      rows = await loadTabRows(artist, section, Boolean(known), fresh);
+    } else {
+      section = getSection(artist, req.query.section);
+      rows = (await loadSongsCached(artist, section, fresh)).everything || [];
+    }
 
     res.set("Cache-Control", "public, max-age=120");
-    res.json({
-      artist: artist.key,
-      section: section.name,
-      sheet: getSheetEditUrl(artist, section),
-      rows: songs.everything || []
-    });
+    res.json({ artist: artist.key, section: section.name, sheet: getSheetEditUrl(artist, section), rows });
   } catch (err) {
-    console.error(err);
+    console.error("[tracker-rows]", err.message || err);
     res.status(500).json({ error: "Failed to load tracker." });
+  }
+});
+
+// the picture sitting in one row of a tab (art, jewelry, tattoos...). Google
+// will not let another site load these addresses, so they come through here
+app.get("/row-image", async (req, res) => {
+  try {
+    const artist = getArtist(req.query.artist, req.query.custom);
+    const gid = String(req.query.gid || "");
+    const index = Number(req.query.i);
+    if (!/^\d{1,12}$/.test(gid) || !Number.isInteger(index) || index < 0) return res.status(400).send("Bad request.");
+
+    const grid = await readSheetTab(artist, gid);
+    const url = atCoverSize((grid.imageRows || [])[index], artist.site);
+    if (!/^https?:\/\//i.test(url)) return res.status(404).send("No picture in that row.");
+
+    const image = await downloadSheetImage(url);
+    if (!image) return res.status(404).send("No picture in that row.");
+
+    res.set("Content-Type", image.type);
+    res.set("Cache-Control", "public, max-age=86400");
+    res.send(image.body);
+  } catch (err) {
+    res.status(502).send("Could not fetch that picture.");
   }
 });
 
