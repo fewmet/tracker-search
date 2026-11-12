@@ -3010,56 +3010,6 @@ app.get("/sheet-image", async (req, res) => {
   }
 });
 
-/*
-  The player lets a cover be chosen by hand: cover-links.json (Yeat) and
-  cover-links-<artist>.json, one direct image link per era. Those beat anything
-  read off the sheet, even when the sheet spells the era a little differently
-  ("Trendi" and "Trëndi"). The same files sit in ./cover-links here, so both
-  apps show the same cover for the same era.
-*/
-const HAND_COVER_DIR = path.join(__dirname, "cover-links");
-const handCoverFiles = new Map();   // file -> { mtime, covers }
-
-function readHandCovers(artist) {
-  const name = artist.key === "yeat" ? "cover-links.json" : `cover-links-${artist.key}.json`;
-  const file = path.join(HAND_COVER_DIR, name);
-
-  try {
-    const mtime = fs.statSync(file).mtimeMs;
-    const held = handCoverFiles.get(file);
-    if (held && held.mtime === mtime) return held.covers;
-
-    const text = fs.readFileSync(file, "utf8");
-    let data;
-    // a stray comma before a closing brace is the usual slip in a hand-edited file
-    try { data = JSON.parse(text); } catch (err) { data = JSON.parse(text.replace(/,(\s*[}\]])/g, "$1")); }
-
-    const listed = (data && (data.covers || data)) || {};
-    const covers = {};
-    Object.keys(listed).forEach(era => {
-      const url = typeof listed[era] === "string" ? listed[era].trim() : "";
-      if (/^https?:\/\//i.test(url)) covers[era] = url;
-    });
-
-    handCoverFiles.set(file, { mtime, covers });
-    return covers;
-  } catch (err) {
-    if (err.code !== "ENOENT") console.warn(`[covers] ${name} could not be read:`, err.message || err);
-    return {};
-  }
-}
-
-function withHandCovers(artist, covers) {
-  const hand = readHandCovers(artist);
-  const names = Object.keys(hand);
-  if (!names.length) return covers;
-
-  const chosen = new Set(names.map(looseEraKey).filter(Boolean));
-  const merged = {};
-  Object.keys(covers).forEach(era => { if (!chosen.has(looseEraKey(era))) merged[era] = covers[era]; });
-  return Object.assign(merged, hand);
-}
-
 app.get("/covers", async (req, res) => {
   const artist = getArtist(req.query.artist, req.query.custom);
   // custom trackers have no art tab, and their covers are not cached
@@ -3069,7 +3019,7 @@ app.get("/covers", async (req, res) => {
     const cached = coverCache.get(artist.key);
     if (cached && Date.now() - cached.at < COVER_TTL_MS) {
       return res.json({
-        artist: artist.key, covers: withHandCovers(artist, cached.covers), cached: true,
+        artist: artist.key, covers: cached.covers, cached: true,
         pending: Boolean(cached.pending)
       });
     }
@@ -3083,7 +3033,7 @@ app.get("/covers", async (req, res) => {
       the sheet has been read.
     */
     if (!peekSheetImages(artist)) {
-      return res.json({ artist: artist.key, covers: withHandCovers(artist, {}), pending: true });
+      return res.json({ artist: artist.key, covers: {}, pending: true });
     }
 
     // the Art tab is only a fallback now, for eras with no picture of their own
@@ -3122,10 +3072,10 @@ app.get("/covers", async (req, res) => {
       (pending ? " (still reading the sheet's own art)" : "")
     );
 
-    res.json({ artist: artist.key, covers: withHandCovers(artist, covers), pending });
+    res.json({ artist: artist.key, covers, pending });
   } catch (err) {
     console.error(`Cover art lookup failed for ${artist.key}:`, err.message || err);
-    res.json({ artist: artist.key, covers: withHandCovers(artist, {}), error: String(err.message || err) });
+    res.json({ artist: artist.key, covers: {}, error: String(err.message || err) });
   }
 });
 

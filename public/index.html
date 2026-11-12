@@ -547,7 +547,8 @@ async function loadCovers(key, tries = 0) {
     });
     covers[key] = { map, low, pending: Boolean(data.pending) };
     paintThumbs();
-    if (data.pending && tries < 10) setTimeout(() => loadCovers(key, tries + 1), 4000);
+    // a big sheet can take well over a minute to read
+    if (data.pending && tries < 30) setTimeout(() => loadCovers(key, tries + 1), 4000);
   } catch (err) {}
 }
 
@@ -639,14 +640,23 @@ function thumb(r, cls) {
   const img = r.img != null && a && r.gid ? API + "/row-image?" + reqArtist(a) + "&gid=" + r.gid + "&i=" + r.img : coverUrl(r.artist, r.era);
   const label = r.era || (r.tabs && r.tabs[0]) || r.artistName;
   return '<span class="thumb ' + (cls || "") + '" style="--h:' + hue(label) + '" data-a="' + esc(r.artist) + '" data-e="' + esc(r.era) + '">' + esc(initials(label)) +
-    (img ? '<img loading="lazy" decoding="async" alt="" src="' + esc(img) + '" onerror="this.remove()">' : "") + "</span>";
+    (img ? '<img loading="lazy" decoding="async" alt="" src="' + esc(img) + '" onerror="coverFailed(this)">' : "") + "</span>";
+}
+
+// Google refuses some pictures when a page asks for dozens at once; one more
+// try a moment later usually gets it
+function coverFailed(img) {
+  if (img.dataset.retried) return img.remove();
+  img.dataset.retried = "1";
+  const src = img.getAttribute("src");
+  setTimeout(() => { img.src = src + (src.includes("?") ? "&" : "?") + "retry=1"; }, 1500);
 }
 
 function paintThumbs() {
   document.querySelectorAll(".thumb[data-e]").forEach(el => {
     if (el.classList.contains("round") || el.querySelector("img")) return;
     const url = coverUrl(el.dataset.a, el.dataset.e);
-    if (url) el.insertAdjacentHTML("beforeend", `<img loading="lazy" decoding="async" alt="" src="${esc(url)}" onerror="this.remove()">`);
+    if (url) el.insertAdjacentHTML("beforeend", `<img loading="lazy" decoding="async" alt="" src="${esc(url)}" onerror="coverFailed(this)">`);
   });
 }
 
@@ -815,7 +825,7 @@ function setHeader() {
   $("#bigTitle").textContent = name;
   $("#navTitle").textContent = name;
   const photo = state.photos[state.artist];
-  $("#avatarBtn").innerHTML = photo ? '<img alt="" src="' + esc(photo) + '" onerror="this.remove()">' : esc(initials(name));
+  $("#avatarBtn").innerHTML = photo ? '<img alt="" src="' + esc(photo) + '" onerror="coverFailed(this)">' : esc(initials(name));
 }
 
 function renderArtists() {
@@ -833,7 +843,7 @@ function renderArtists() {
     const tabs = LS.get("tabs." + a.key, null);
     const sub = [a.custom ? "Added by you" : "", tabs ? tabs.length + (tabs.length === 1 ? " section" : " sections") : ""].filter(Boolean).join(" · ");
     return '<button class="row" data-artist="' + esc(a.key) + '"><span class="thumb round" style="--h:' + hue(a.name) + '">' + esc(initials(a.name)) +
-      (photo ? '<img loading="lazy" alt="" src="' + esc(photo) + '" onerror="this.remove()">' : "") + '</span><span class="body"><span class="rt"><div class="t">' + esc(a.name) + "</div>" +
+      (photo ? '<img loading="lazy" alt="" src="' + esc(photo) + '" onerror="coverFailed(this)">' : "") + '</span><span class="body"><span class="rt"><div class="t">' + esc(a.name) + "</div>" +
       (sub ? '<div class="s">' + esc(sub) + "</div>" : "") + "</span>" + (a.key === state.artist ? ICON.check : ICON.chev) + "</span></button>";
   }).join("") + "</div>" : '<div class="empty"><h2>No Artist Found</h2><p>Not here yet. You can add any Google Sheets tracker yourself.</p></div>';
 
