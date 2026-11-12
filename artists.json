@@ -1,0 +1,1189 @@
+{
+  "_readme": "Tracker Search reads this file: one entry per artist, with the sheet id and the gid of each tab.",
+  "defaultArtist": "yeat",
+  "order": [
+    "yeat",
+    "uzi",
+    "carti",
+    "ken",
+    "lonely",
+    "homixidegang",
+    "kanye",
+    "thug",
+    "juicewrld",
+    "future",
+    "lucki",
+    "summrs",
+    "yachty",
+    "xxxtentacion",
+    "skimasktheslumpgod",
+    "trippieredd",
+    "lilpeep",
+    "edwardskeletrix",
+    "gunna",
+    "joji",
+    "kendricklamar",
+    "osamason",
+    "pierrebourne",
+    "popsmoke",
+    "rihanna",
+    "sheffg",
+    "denzelcurry",
+    "chiefkeef",
+    "mfdoom",
+    "nettspend",
+    "radiohead",
+    "tyler",
+    "kash",
+    "xaviersobased"
+  ],
+  "artists": [
+    {
+      "key": "yeat",
+      "name": "Yeat",
+      "sheetId": "1FUzAZyTCgFTVxQ--qbCAS2bUk4dsAw6ASxwjURPHbyI",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1241081326"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1617341558"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1823522157"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "2101310376"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "559352580"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "993561083"
+        }
+      ],
+      "theme": "green"
+    },
+    {
+      "key": "uzi",
+      "name": "Lil Uzi Vert",
+      "sheetId": "1zqqdIds1iwnx4lh29iF1IlraeuqfGhxH9qLNlWOnryo",
+      "artGid": "135971633",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1160569231"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1339726772"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "751366210"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "1744365588"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "1521065182"
+        }
+      ],
+      "theme": "violet"
+    },
+    {
+      "key": "carti",
+      "name": "Playboi Carti",
+      "sheetId": "1Irtfvymu26CShYowLMMfD-rM0o9CJqE6-BBSlYsAaF4",
+      "artGid": "487023460",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "0"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1962169030"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "334149012"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "2032692991"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "2131545997"
+        }
+      ],
+      "theme": "mono"
+    },
+    {
+      "key": "ken",
+      "name": "Ken Carson",
+      "sheetId": "1OARID98xCqRaBr8gyQCvI3aD4jKQDGgtedyRaiP_pyo",
+      "artGid": "1908257498",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1367980602"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "907300840"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of & Special",
+          "gid": "210493594"
+        }
+      ],
+      "theme": "crimson"
+    },
+    {
+      "key": "lonely",
+      "name": "Destroy Lonely",
+      "sheetId": "1J16EyxHqZD4m0VZ6g6SoY_1GC21TU7P2kk9FeteSKvE",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "2018221909"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1413127973"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "739259521"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "956556872"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "1350969358"
+        }
+      ],
+      "theme": "copper"
+    },
+    {
+      "key": "homixidegang",
+      "name": "Homixide Gang",
+      "sheetId": "15eM2g5vJWJIRl1qRYZoGgbKxUXRqIANRKLykqM7ps2M",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1520634709"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "133274625"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1612328910"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "271380714"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "829667286"
+        }
+      ],
+      "accent": "#c70d00"
+    },
+    {
+      "key": "kanye",
+      "name": "Kanye West",
+      "sheetId": "12nGHPPh5dVTfLuBLVQYzC3QgPxKfvp-jgCoNccvEasM",
+      "artGid": "1659647236",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "199908479"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1385926980"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "787540803"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "812818104"
+        },
+        {
+          "key": "grails",
+          "name": "Grails / Wanted",
+          "gid": "1948929917"
+        }
+      ],
+      "theme": "sand"
+    },
+    {
+      "key": "thug",
+      "name": "Young Thug",
+      "sheetId": "12zc2reK5y8XP6SQhv1ujQtiG9VpJy7yDWwDuE-S-wpc",
+      "artGid": "171524654",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "0"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1507357362"
+        },
+        {
+          "key": "highlights",
+          "name": "Highlights",
+          "gid": "1816766111"
+        }
+      ],
+      "theme": "amber"
+    },
+    {
+      "key": "juicewrld",
+      "name": "Juice WRLD",
+      "sheetId": "1tD3ytt5wPx4zfcefXi5ATeYhIiDaugWjMS46nZrP568",
+      "artGid": "973925715",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "0"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1558109614"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of & Special",
+          "gid": "1026508737"
+        },
+        {
+          "key": "grails",
+          "name": "Grails & Wanted",
+          "gid": "1176245952"
+        }
+      ],
+      "theme": "indigo"
+    },
+    {
+      "key": "future",
+      "name": "Future",
+      "sheetId": "1WrsgBEo5pv1eFC8ge6kG-FmSV6eZd_N_9t5HCNir7mk",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "610753461"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1932564138"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of / Special",
+          "gid": "1016812416"
+        },
+        {
+          "key": "grails",
+          "name": "Grails / Wanted",
+          "gid": "1017030528"
+        }
+      ],
+      "theme": "ice"
+    },
+    {
+      "key": "lucki",
+      "name": "Lucki",
+      "sheetId": "1zoRNpy7Lvr-JzPqtQLLWRVVDbgKygpBaDf4cC-Lt6k4",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "306146520"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1422898255"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "607457161"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "659893300"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "168366243"
+        }
+      ],
+      "theme": "rose"
+    },
+    {
+      "key": "summrs",
+      "name": "Summrs",
+      "sheetId": "13yCSXxHCBhNGzO6kBGr_MMmRDNLu9j4X10vn_CSBuG4",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "306146520"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1422898255"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "607457161"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "100948374"
+        },
+        {
+          "key": "grails",
+          "name": "Grails / Wanted",
+          "gid": "168366243"
+        }
+      ],
+      "theme": "aqua"
+    },
+    {
+      "key": "yachty",
+      "name": "Lil Yachty",
+      "sheetId": "122UuKwiKLuoP36tr8r4WTjOouy2gDJGRUDXCc4uD9lw",
+      "artGid": "1815328837",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "0"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1441697998"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "381712014"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "1228414875"
+        },
+        {
+          "key": "grails",
+          "name": "Grails / Wanted",
+          "gid": "1248999078"
+        }
+      ],
+      "theme": "magenta"
+    },
+    {
+      "key": "xxxtentacion",
+      "name": "XXXTENTACION",
+      "sheetId": "1vMEIba05N8zD2iSh_knAkAMzyrm9rtreu1NJeyNZj0I",
+      "artGid": "1057487983",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1286952088"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1470024127"
+        },
+        {
+          "key": "bestofreleased",
+          "name": "Best Of (Released)",
+          "gid": "1292655868"
+        },
+        {
+          "key": "bestofunreleased",
+          "name": "Best Of (Unreleased)",
+          "gid": "911301616"
+        },
+        {
+          "key": "specialreleased",
+          "name": "Special (Released)",
+          "gid": "674608677"
+        },
+        {
+          "key": "specialunreleased",
+          "name": "Special (Unreleased)",
+          "gid": "73729629"
+        },
+        {
+          "key": "grailsreleased",
+          "name": "Grails (Released)",
+          "gid": "1342911502"
+        },
+        {
+          "key": "grailsunreleased",
+          "name": "Grails (Unreleased)",
+          "gid": "1235891986"
+        }
+      ],
+      "accent": "#5a9ce2"
+    },
+    {
+      "key": "skimasktheslumpgod",
+      "name": "Ski Mask the Slump God",
+      "sheetId": "1j7_2JVQ2eyaVA6vEQT89R8XhOXUR8KTJbVgTUm_ZD88",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "116647059"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1894027004"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "576704886"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "279928649"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "1702010600"
+        }
+      ],
+      "accent": "#e88802"
+    },
+    {
+      "key": "trippieredd",
+      "name": "Trippie Redd",
+      "sheetId": "1hZdGFBZmukWGH4IlnH0NJvphwEct2XEMJT_moTFhTvc",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "235787845"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "358090838"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1621457665"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "1116451968"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "30243932"
+        },
+        {
+          "key": "wanted",
+          "name": "Wanted",
+          "gid": "721959570"
+        }
+      ],
+      "accent": "#ff0000"
+    },
+    {
+      "key": "lilpeep",
+      "name": "Lil Peep",
+      "sheetId": "1kF3KZUjtwiJxxP0GCXJ0VmX7bA2JdwnKa-j1GCaoeC8",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1214485872"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1922125410"
+        }
+      ],
+      "accent": "#de17c3"
+    },
+    {
+      "key": "edwardskeletrix",
+      "name": "Edward Skeletrix",
+      "sheetId": "1CnfVdc37A81ZX7lUs4L-J2JfqaW2z3pbkR2W6dRuFS0",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "298000351"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1073398179"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "325789807"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "749099936"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "1393458920"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "1680743207"
+        },
+        {
+          "key": "skeletrixislandradio667",
+          "name": "Skeletrix Island Radio 66.7",
+          "gid": "1645164964"
+        }
+      ],
+      "accent": "#0eb4e1"
+    },
+    {
+      "key": "gunna",
+      "name": "Gunna",
+      "sheetId": "1P_BA-CIy05lDl9j1H06awxNqvXYJcD-KeBPVdgTO7Eo",
+      "artGid": "79062216",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1630289126"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "219194829"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "263415468"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "73706705"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "919674572"
+        }
+      ],
+      "accent": "#b200ff"
+    },
+    {
+      "key": "joji",
+      "name": "Joji",
+      "sheetId": "1FPlWbXnx94y5FODJ2qniLf0BzViNSAmj6Xdfw1ZNwQ4",
+      "artGid": "1419046321",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "990933532"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "108045339"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "583378522"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1251408802"
+        },
+        {
+          "key": "grailswanted",
+          "name": "Grails / Wanted",
+          "gid": "467994030"
+        }
+      ],
+      "accent": "#b91313"
+    },
+    {
+      "key": "kendricklamar",
+      "name": "Kendrick Lamar",
+      "sheetId": "1i4OQglDHiiqMDthqfUFPutGmpZzK7n63LaoWApqhQXI",
+      "artGid": "1807741861",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1169728352"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "95049489"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "95049489"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1702066926"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "295973712"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "2082629581"
+        }
+      ],
+      "accent": "#525252"
+    },
+    {
+      "key": "osamason",
+      "name": "OsamaSon",
+      "sheetId": "1qbJpawdwnw7IUkZ4FfU3oOF17griNjL59X5z6YFiFlY",
+      "artGid": "1915251821",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "585347098"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1979018091"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "149830587"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1293941440"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "544358042"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "973935607"
+        },
+        {
+          "key": "wanted",
+          "name": "Wanted",
+          "gid": "198138428"
+        }
+      ],
+      "accent": "#cebe0d"
+    },
+    {
+      "key": "pierrebourne",
+      "name": "Pi'erre Bourne",
+      "sheetId": "10nxKfjzuGTlvieAoDWJ8VcDPj2Jxy1bnNeLxzjLq2i8",
+      "artGid": "1593876185",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "548968228"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "2051758826"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1058231773"
+        },
+        {
+          "key": "grailswanted",
+          "name": "Grails/Wanted",
+          "gid": "2007185892"
+        }
+      ],
+      "accent": "#a55ae2"
+    },
+    {
+      "key": "popsmoke",
+      "name": "Pop Smoke",
+      "sheetId": "1-Kd8molYeR1WpmWR81DqmSCGng3g-AVmZfgd752kh3M",
+      "artGid": "171524654",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "0"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1507357362"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1816766111"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "789493422"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "53264667"
+        }
+      ],
+      "accent": "#0f0cac"
+    },
+    {
+      "key": "rihanna",
+      "name": "Rihanna",
+      "sheetId": "1HMqjw55sCPUGyI_UBc-JcO881FHzUTX08NvQY9oa61k",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "415494178"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1342576935"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1586447261"
+        }
+      ],
+      "accent": "#715ae2"
+    },
+    {
+      "key": "sheffg",
+      "name": "Sheff G",
+      "sheetId": "1VsUkKon5S5SA-XVJ8_sgn44ZiodGaawH3GYujbmp8-c",
+      "artGid": "1752891152",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1199475919"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1661111048"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "593351378"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "189213765"
+        }
+      ],
+      "accent": "#5a95e2"
+    },
+    {
+      "key": "denzelcurry",
+      "name": "Denzel Curry",
+      "sheetId": "1Pyi72FNT6KWuQE3g4BmIDCV26HMfKFcE650Duyia43o",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "788157788"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "573566409"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "70327685"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "835651363"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "1410366498"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "1939019399"
+        }
+      ],
+      "accent": "#5c5c5c"
+    },
+    {
+      "key": "chiefkeef",
+      "name": "Chief Keef",
+      "sheetId": "1oDE9gTnEG7ufPQIOMjLTegfI47qtgNCxngmxxHZL4qA",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1792554832"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "766098554"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1321754498"
+        }
+      ],
+      "accent": "#83e25a"
+    },
+    {
+      "key": "mfdoom",
+      "name": "MF DOOM",
+      "sheetId": "1zEbzMVXFXzuY4wLdPvdQA23lb3RwCSOKqWtHsllXNk8",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1493533867"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1476766908"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1931259788"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "466025248"
+        },
+        {
+          "key": "grailswanted",
+          "name": "Grails/Wanted",
+          "gid": "2105966408"
+        }
+      ],
+      "accent": "#448e25"
+    },
+    {
+      "key": "nettspend",
+      "name": "Nettspend",
+      "sheetId": "1on69bzqAR5WpR2ZuGGbGoMtltq5yCeXaCK4CJ2KkHcM",
+      "artGid": "950061290",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "887238113"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "479822205"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1507357362"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "472238552"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "2119726927"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "701111194"
+        }
+      ],
+      "accent": "#fbe7a1"
+    },
+    {
+      "key": "radiohead",
+      "name": "Radiohead",
+      "sheetId": "176VMdQqyLmFodWpZLgLqkvup4izKpcQQmBwPFLEw9GM",
+      "artGid": "171524654",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "0"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1510699798"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1876877616"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "115891087"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "936520024"
+        }
+      ],
+      "accent": "#206680"
+    },
+    {
+      "key": "tyler",
+      "name": "Tyler, The Creator",
+      "site": "https://tylertracker.net",
+      "sheetId": "1884837542",
+      "artGid": "1561502439",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "937104017"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1734736073"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1356276013"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "665842249"
+        },
+        {
+          "key": "notable",
+          "name": "Notable",
+          "gid": "587917923"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "428406159"
+        }
+      ],
+      "accent": "#e5c46d"
+    },
+    {
+      "key": "kash",
+      "name": "kash",
+      "sheetId": "1D_TUwPWesZ9vSrqw8C5i2OzttS4a_eBws303gILT-IA",
+      "artGid": "1375789260",
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "1903928500"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1993478306"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "163996959"
+        }
+      ],
+      "accent": "#0dffdf"
+    },
+    {
+      "key": "xaviersobased",
+      "name": "xaviersobased",
+      "sheetId": "1-YsBGzZVLBw_Dnm1tgndRJoRkPtS5WKW1XmPBbKPcS0",
+      "artGid": null,
+      "sections": [
+        {
+          "key": "unreleased",
+          "name": "Unreleased",
+          "gid": "0"
+        },
+        {
+          "key": "released",
+          "name": "Released",
+          "gid": "1510699798"
+        },
+        {
+          "key": "recent",
+          "name": "Recent",
+          "gid": "1507357362"
+        },
+        {
+          "key": "bestof",
+          "name": "Best Of",
+          "gid": "1816766111"
+        },
+        {
+          "key": "special",
+          "name": "Special",
+          "gid": "849632489"
+        },
+        {
+          "key": "grails",
+          "name": "Grails",
+          "gid": "936520024"
+        },
+        {
+          "key": "wanted",
+          "name": "Wanted",
+          "gid": "898828598"
+        }
+      ],
+      "accent": "#e2875a"
+    }
+  ]
+}

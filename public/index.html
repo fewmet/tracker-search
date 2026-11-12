@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tracker Search</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tracker Search">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="search-icon-180.png">
+<link rel="icon" type="image/png" href="search-icon-180.png">
+<style>
+  :root {
+    --bg: #f2f2f7;
+    --cell: #ffffff;
+    --cell-press: #e5e5ea;
+    --sheet: #f2f2f7;
+    --fill: rgba(118, 118, 128, 0.12);
+    --fill-2: rgba(118, 118, 128, 0.2);
+    --sep: rgba(60, 60, 67, 0.2);
+    --label: #000000;
+    --label-2: rgba(60, 60, 67, 0.62);
+    --label-3: rgba(60, 60, 67, 0.32);
+    --tint: #007aff;
+    --tint-soft: rgba(0, 122, 255, 0.13);
+    --bar: rgba(249, 249, 249, 0.82);
+    --green: #34c759; --orange: #ff9500; --yellow: #d9a400; --red: #ff3b30; --gray: #8e8e93;
+    --mark: rgba(255, 204, 0, 0.42);
+    --desk: #d9d9de;
+    --safe-t: env(safe-area-inset-top, 0px);
+    --safe-b: env(safe-area-inset-bottom, 0px);
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000;
+      --cell: #1c1c1e;
+      --cell-press: #2c2c2e;
+      --sheet: #1c1c1e;
+      --fill: rgba(118, 118, 128, 0.24);
+      --fill-2: rgba(118, 118, 128, 0.36);
+      --sep: rgba(84, 84, 88, 0.6);
+      --label: #ffffff;
+      --label-2: rgba(235, 235, 245, 0.62);
+      --label-3: rgba(235, 235, 245, 0.3);
+      --tint: #0a84ff;
+      --tint-soft: rgba(10, 132, 255, 0.2);
+      --bar: rgba(22, 22, 24, 0.8);
+      --green: #30d158; --orange: #ff9f0a; --yellow: #ffd60a; --red: #ff453a; --gray: #8e8e93;
+      --mark: rgba(255, 214, 10, 0.3);
+      --desk: #0b0b0d;
+    }
+    .sheet { --cell: #2c2c2e; --cell-press: #3a3a3c; }
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--label);
+    font: 17px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; text-align: inherit; cursor: pointer; }
+  input { font: inherit; color: inherit; }
+
+  #app { position: fixed; inset: 0; background: var(--bg); overflow: hidden; }
+  @media (min-width: 640px) {
+    body { background: var(--desk); }
+    #app { inset: 20px auto 20px 50%; width: 430px; margin-left: -215px; border-radius: 38px; box-shadow: 0 30px 80px rgba(0,0,0,.35), 0 0 0 1px var(--sep); }
+  }
+
+  /* ---------- views ---------- */
+  .view { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .nav {
+    flex: none; height: calc(44px + var(--safe-t)); padding-top: var(--safe-t);
+    display: flex; align-items: center; justify-content: center; position: relative;
+    background: var(--bg); z-index: 3;
+  }
+  .nav-title { font-weight: 600; font-size: 17px; opacity: 0; transition: opacity .18s; max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .view.scrolled .nav-title { opacity: 1; }
+  .view.scrolled .stick, .view.scrolled .nav.solo { box-shadow: 0 .5px 0 var(--sep); }
+  .nav-btn { position: absolute; right: 16px; bottom: 6px; height: 32px; display: flex; align-items: center; color: var(--tint); font-size: 17px; }
+  .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; padding-bottom: calc(70px + var(--safe-b)); scrollbar-width: none; }
+  .scroll::-webkit-scrollbar, .sheet-body::-webkit-scrollbar { display: none; }
+  .sheet-body { scrollbar-width: none; }
+
+  .large { display: flex; align-items: flex-end; gap: 12px; padding: 0 16px 6px 20px; }
+  .large .txt { flex: 1; min-width: 0; }
+  .over { font-size: 13px; font-weight: 600; color: var(--label-2); text-transform: uppercase; letter-spacing: .02em; }
+  .large h1 { margin: 0; font-size: 34px; line-height: 41px; font-weight: 700; letter-spacing: .011em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .avatar { flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--fill-2) center/cover; display: grid; place-items: center; font-size: 14px; font-weight: 600; color: var(--label-2); margin-bottom: 3px; overflow: hidden; }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .stick { position: sticky; top: 0; z-index: 2; background: var(--bg); padding: 4px 0 0; }
+  .searchrow { display: flex; align-items: center; padding: 0 16px; }
+  .field { flex: 1; min-width: 0; height: 36px; border-radius: 10px; background: var(--fill); display: flex; align-items: center; padding: 0 8px; gap: 6px; }
+  .field svg { flex: none; width: 16px; height: 16px; color: var(--label-2); }
+  .field input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font-size: 17px; padding: 0; -webkit-user-select: text; user-select: text; }
+  .field input::placeholder { color: var(--label-2); }
+  .field input::-webkit-search-cancel-button { display: none; }
+  .clear { flex: none; width: 17px; height: 17px; border-radius: 50%; background: var(--label-3); color: var(--bg); display: grid; place-items: center; }
+  .clear svg { width: 9px; height: 9px; color: var(--cell); }
+  .cancel { color: var(--tint); white-space: nowrap; overflow: hidden; max-width: 0; opacity: 0; padding-left: 0; transition: max-width .25s, opacity .2s, padding .25s; }
+  .searching .cancel { max-width: 90px; opacity: 1; padding-left: 12px; }
+
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; }
+  .chip { flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: var(--fill); font-size: 15px; font-weight: 500; display: flex; align-items: center; gap: 5px; white-space: nowrap; max-width: 220px; transition: transform .12s; }
+  .chip span { overflow: hidden; text-overflow: ellipsis; }
+  .chip svg { flex: none; width: 10px; height: 10px; opacity: .55; }
+  .chip.on { background: var(--tint); color: #fff; }
+  .chip.on svg { opacity: .9; }
+  .chip:active { transform: scale(.95); }
+
+  /* ---------- lists ---------- */
+  .sec-h { display: flex; align-items: baseline; justify-content: space-between; padding: 14px 32px 7px; font-size: 13px; color: var(--label-2); text-transform: uppercase; letter-spacing: .01em; }
+  .sec-h button { color: var(--tint); font-size: 15px; text-transform: none; letter-spacing: 0; }
+  .group { margin: 0 16px; background: var(--cell); border-radius: 12px; overflow: hidden; }
+  .row { width: 100%; display: flex; align-items: center; gap: 12px; padding: 0 0 0 12px; min-height: 60px; position: relative; text-align: left; }
+  .row:active { background: var(--cell-press); }
+  .row .body { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 9px 12px 9px 0; min-height: 60px; align-self: stretch; }
+  .row + .row .body { box-shadow: 0 -.5px 0 var(--sep); }
+  .row .rt { flex: 1; min-width: 0; }
+  .t { font-size: 16px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s { font-size: 13px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+  .m { font-size: 13px; color: var(--label-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+  .m span { overflow: hidden; text-overflow: ellipsis; }
+  .n { font-size: 12.5px; color: var(--label-2); margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
+  mark { background: var(--mark); color: inherit; border-radius: 3px; padding: 0 1px; }
+  .dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--gray); }
+  .dot.g { background: var(--green); } .dot.o { background: var(--orange); } .dot.y { background: var(--yellow); } .dot.r { background: var(--red); }
+  .rr { flex: none; font-size: 14px; color: var(--label-2); font-variant-numeric: tabular-nums; }
+  .chev { flex: none; width: 8px; height: 13px; color: var(--label-3); }
+  .check { flex: none; width: 15px; height: 15px; color: var(--tint); }
+  .thumb { flex: none; width: 44px; height: 44px; border-radius: 7px; position: relative; overflow: hidden; display: grid; place-items: center; font-size: 13px; font-weight: 700; color: #fff; background: hsl(var(--h, 210) 38% 46%); letter-spacing: .02em; }
+  .thumb.round { border-radius: 50%; }
+  .thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .thumb.ic { background: var(--fill); color: var(--tint); }
+  .thumb.ic svg { width: 20px; height: 20px; }
+  .plain .row { min-height: 44px; } .plain .row .body { min-height: 44px; }
+
+  .note { padding: 9px 32px 0; font-size: 13px; color: var(--label-2); }
+  .empty { padding: 70px 40px 0; text-align: center; color: var(--label-2); }
+  .empty svg { width: 52px; height: 52px; color: var(--label-3); }
+  .empty h2 { margin: 12px 0 4px; font-size: 22px; font-weight: 700; color: var(--label); }
+  .empty p { margin: 0; font-size: 15px; }
+  .empty button { margin-top: 18px; height: 44px; padding: 0 22px; border-radius: 12px; background: var(--tint); color: #fff; font-weight: 600; }
+
+  .skel .row { pointer-events: none; }
+  .skel .thumb, .skel i { background: var(--fill); animation: pulse 1.2s ease-in-out infinite; }
+  .skel i { display: block; height: 11px; border-radius: 6px; margin: 5px 0; }
+  @keyframes pulse { 50% { opacity: .45; } }
+
+  .hint { margin: 6px 16px 0; padding: 12px 14px; border-radius: 12px; background: var(--cell); display: flex; gap: 12px; align-items: center; font-size: 14px; color: var(--label-2); }
+  .hint b { color: var(--label); font-weight: 600; display: block; font-size: 15px; }
+  .hint img { width: 40px; height: 40px; border-radius: 9px; flex: none; }
+  .hint button { color: var(--label-3); font-size: 22px; line-height: 1; padding: 6px; }
+
+  /* ---------- tab bar ---------- */
+  .tabbar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; padding: 0 0 var(--safe-b); height: calc(50px + var(--safe-b)); background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); box-shadow: 0 -.5px 0 var(--sep); }
+  .tab { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: var(--gray); font-size: 10px; font-weight: 500; }
+  .tab svg { width: 25px; height: 25px; }
+  .tab.on { color: var(--tint); }
+
+  /* ---------- sheets ---------- */
+  .backdrop { position: absolute; inset: 0; z-index: 8; background: rgba(0,0,0,.4); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  .backdrop.on { opacity: 1; pointer-events: auto; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 9; max-height: calc(100% - 28px - var(--safe-t)); background: var(--sheet); border-radius: 14px 14px 0 0; display: flex; flex-direction: column; transform: translateY(105%); transition: transform .42s cubic-bezier(.32,.72,0,1); will-change: transform; }
+  .sheet.on { transform: none; }
+  .sheet.drag { transition: none; }
+  .sheet.tall { height: calc(100% - 28px - var(--safe-t)); }
+  .sheet-head { flex: none; padding: 6px 16px 8px; touch-action: none; }
+  .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--label-3); margin: 0 auto 8px; }
+  .sheet-bar { display: flex; align-items: center; min-height: 30px; }
+  .sheet-bar h3 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sheet-bar .side { width: 60px; color: var(--tint); font-size: 17px; }
+  .sheet-bar .side.r { text-align: right; font-weight: 600; }
+  .sheet-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding-bottom: calc(24px + var(--safe-b)); }
+  .sheet .field { margin: 0 16px 10px; }
+
+  .hero { display: flex; gap: 14px; padding: 6px 20px 4px; align-items: center; }
+  .hero .thumb { width: 92px; height: 92px; border-radius: 12px; font-size: 24px; box-shadow: 0 6px 18px rgba(0,0,0,.22); }
+  .hero h2 { margin: 0; font-size: 22px; line-height: 1.18; font-weight: 700; -webkit-user-select: text; user-select: text; word-break: break-word; }
+  .hero p { margin: 4px 0 0; font-size: 15px; color: var(--label-2); -webkit-user-select: text; user-select: text; }
+  .hero .era { color: var(--tint); font-weight: 500; }
+  .pills { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 20px 2px; }
+  .pill { font-size: 12px; font-weight: 600; padding: 4px 9px; border-radius: 7px; background: var(--fill); color: var(--label-2); display: flex; align-items: center; gap: 5px; }
+  .actions { display: flex; gap: 8px; padding: 14px 16px 2px; }
+  .act { flex: 1; min-width: 0; height: 58px; border-radius: 12px; background: var(--cell); color: var(--tint); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 12px; font-weight: 500; }
+  .act svg { width: 22px; height: 22px; }
+  .act:active { background: var(--cell-press); }
+  .act.primary { background: var(--tint); color: #fff; }
+  .act.primary:active { opacity: .8; background: var(--tint); }
+  .notes { margin: 0 16px; padding: 12px 14px; border-radius: 12px; background: var(--cell); font-size: 15px; line-height: 1.38; white-space: pre-wrap; word-break: break-word; -webkit-user-select: text; user-select: text; }
+  .kv .row { min-height: 44px; padding-left: 16px; } .kv .row .body { min-height: 44px; }
+  .kv .k { flex: none; font-size: 16px; }
+  .kv .v { flex: 1; min-width: 0; text-align: right; color: var(--label-2); font-size: 16px; -webkit-user-select: text; user-select: text; word-break: break-word; }
+  .lnk .t { color: var(--tint); font-weight: 400; }
+  .lnk .copy { flex: none; color: var(--tint); font-size: 15px; padding: 8px 2px 8px 10px; }
+
+  .toast { position: absolute; left: 50%; bottom: calc(70px + var(--safe-b)); z-index: 20; transform: translate(-50%, 20px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .25s; background: rgba(50,50,54,.94); color: #fff; font-size: 15px; font-weight: 500; padding: 10px 16px; border-radius: 22px; white-space: nowrap; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Search -->
+  <section class="view" id="v-search">
+    <header class="nav"><div class="nav-title" id="navTitle"></div></header>
+    <div class="scroll" id="scrollSearch">
+      <div class="large">
+        <div class="txt"><div class="over">Tracker Search</div><h1 id="bigTitle">Loading</h1></div>
+        <button class="avatar" id="avatarBtn" aria-label="Change tracker"></button>
+      </div>
+      <div class="stick" id="stick">
+        <div class="searchrow">
+          <label class="field">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6.7" cy="6.7" r="4.9"/><path d="M10.5 10.5 14.4 14.4"/></svg>
+            <input id="q" type="search" inputmode="search" enterkeyhint="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Songs, features, eras, notes">
+            <button class="clear" id="clearQ" hidden aria-label="Clear"><svg viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg></button>
+          </label>
+          <button class="cancel" id="cancelQ">Cancel</button>
+        </div>
+        <div class="chips" id="chips"></div>
+      </div>
+      <div id="results"></div>
+    </div>
+  </section>
+
+  <!-- Trackers -->
+  <section class="view" id="v-trackers" hidden>
+    <header class="nav solo"><div class="nav-title">Trackers</div></header>
+    <div class="scroll">
+      <div class="large"><div class="txt"><h1>Trackers</h1></div></div>
+      <div class="stick"><div class="searchrow" style="padding-bottom:10px"><label class="field">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6.7" cy="6.7" r="4.9"/><path d="M10.5 10.5 14.4 14.4"/></svg>
+        <input id="artistQ" type="search" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Find an artist"></label></div></div>
+      <div id="artistList"></div>
+    </div>
+  </section>
+
+  <!-- Saved -->
+  <section class="view" id="v-saved" hidden>
+    <header class="nav solo"><div class="nav-title">Saved</div></header>
+    <div class="scroll">
+      <div class="large"><div class="txt"><h1>Saved</h1></div></div>
+      <div id="savedList"></div>
+    </div>
+  </section>
+
+  <nav class="tabbar">
+    <button class="tab on" data-tab="search"><svg viewBox="0 0 25 25" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="11" cy="11" r="6.6"/><path d="M16 16l5 5"/></svg>Search</button>
+    <button class="tab" data-tab="trackers"><svg viewBox="0 0 25 25" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4.5" width="17" height="16" rx="3.5"/><path d="M4 10h17M10 10v10.5"/></svg>Trackers</button>
+    <button class="tab" data-tab="saved"><svg viewBox="0 0 25 25" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12.5 3.8l2.6 5.5 6 .8-4.4 4.2 1.1 6-5.3-2.9-5.3 2.9 1.1-6-4.4-4.2 6-.8z"/></svg>Saved</button>
+  </nav>
+
+  <div class="backdrop" id="backdrop"></div>
+  <div class="sheet" id="sheet">
+    <div class="sheet-head" id="sheetHead">
+      <div class="grab"></div>
+      <div class="sheet-bar"><button class="side" id="sheetLeft"></button><h3 id="sheetTitle"></h3><button class="side r" id="sheetDone">Done</button></div>
+    </div>
+    <div class="sheet-body" id="sheetBody"></div>
+  </div>
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* Where this app's server lives. Empty means "the site this page is on". */
+const API = "";
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const norm = s => String(s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase()
+  .replace(/[’'`]/g, "").replace(/[^\p{L}\p{N}$]+/gu, " ").trim();
+const firstLine = s => String(s || "").split("\n")[0].trim();
+const num = n => Number(n).toLocaleString("en-US");
+const hue = s => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const initials = s => (String(s).replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/).slice(0, 2).map(w => w[0] || "").join("") || "?").toUpperCase();
+
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem("ts." + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem("ts." + k, JSON.stringify(v)); } catch (e) {} }
+};
+
+/* A tab of a tracker is kept on the phone, so reopening one is instant. */
+const idb = (() => {
+  let opening;
+  const open = () => opening || (opening = new Promise((res, rej) => {
+    const r = indexedDB.open("tracker-search", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("tabs");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  }));
+  return {
+    async get(k) {
+      try {
+        const db = await open();
+        return await new Promise(res => { const q = db.transaction("tabs").objectStore("tabs").get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(null); });
+      } catch (e) { return null; }
+    },
+    async set(k, v) { try { (await open()).transaction("tabs", "readwrite").objectStore("tabs").put(v, k); } catch (e) {} }
+  };
+})();
+
+const ICON = {
+  chev: '<svg class="chev" viewBox="0 0 8 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 1.5l5 5-5 5"/></svg>',
+  down: '<svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 3.5l3.5 3.5 3.5-3.5"/></svg>',
+  check: '<svg class="check" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8l4 4 7-9"/></svg>',
+  clock: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="10" r="7.3"/><path d="M10 5.8V10l2.8 1.8"/></svg>',
+  globe: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7.3"/><path d="M2.7 10h14.6M10 2.7c2.4 2.2 2.4 12.4 0 14.6M10 2.7c-2.4 2.2-2.4 12.4 0 14.6"/></svg>',
+  play: '<svg viewBox="0 0 22 22" fill="currentColor"><path d="M7 4.3v13.4c0 .8.9 1.3 1.6.8l10-6.7c.6-.4.6-1.2 0-1.6l-10-6.7C7.900 3 7 3.500 7 4.300z"/></svg>',
+  link: '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9.300 12.700a3.800 3.800 0 005.400 0l3.200-3.200a3.800 3.800 0 00-5.400-5.400l-1 1"/><path d="M12.700 9.300a3.800 3.800 0 00-5.400 0l-3.200 3.200a3.800 3.800 0 005.400 5.400l1-1"/></svg>',
+  star: '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M11 3l2.400 5 5.500.700-4 3.800 1 5.500-4.900-2.700L6.100 18l1-5.500-4-3.800 5.500-.700z"/></svg>',
+  starOn: '<svg viewBox="0 0 22 22" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M11 3l2.400 5 5.500.700-4 3.800 1 5.500-4.900-2.700L6.100 18l1-5.500-4-3.800 5.500-.700z"/></svg>',
+  share: '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 13.500V3M7.300 6.300L11 2.700l3.700 3.600M6.500 9.500H5.300A1.800 1.800 0 003.500 11.300v6.400a1.800 1.800 0 001.800 1.800h11.400a1.800 1.800 0 001.800-1.800v-6.400a1.800 1.800 0 00-1.800-1.800h-1.200"/></svg>',
+  sheet: '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><rect x="3.500" y="3.500" width="15" height="15" rx="3"/><path d="M3.500 9h15M3.500 13.500h15M9 9v9.500"/></svg>',
+  search: '<svg viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="3.400" stroke-linecap="round"><circle cx="22" cy="22" r="14"/><path d="M33 33l12 12"/></svg>'
+};
+
+/* ---------------------------------------------------------------- state */
+const state = {
+  artists: [], byKey: {}, photos: {},
+  artist: LS.get("artist", ""), all: false,
+  q: "", f: { tab: "", era: "", quality: "", avail: "", type: "", file: false },
+  recents: LS.get("recents", []),
+  saved: LS.get("saved", [])
+};
+const trackers = new Map();   // artist key -> { parts, rows, done, total, failed }
+const covers = {};            // artist key -> { map, low }
+let view = [], shown = 0, tokens = [], sheetRows = null;
+
+/* ---------------------------------------------------------------- loading */
+function buildRows(t, a) {
+  const by = new Map();
+  t.rows = [];
+
+  t.parts.forEach((part, i) => {
+    if (!part) return;
+    const sec = a.sections[i];
+
+    part.rows.forEach(r => {
+      const nameN = norm(r.name);
+      const links = r.links || [];
+      const k = nameN + "|" + (links[0] || norm(r.era));
+      const had = by.get(k);
+
+      // Best Of, Special, Recent and Grails re-list songs: one row, several tabs
+      if (had) {
+        if (!had.tabs.includes(sec.name)) had.tabs.push(sec.name);
+        if (!had.notes && r.notes) { had.notes = r.notes; had.notesN = norm(r.notes); }
+        return;
+      }
+
+      const lines = String(r.name).split("\n").map(x => x.trim()).filter(Boolean);
+      const m = Object.assign({}, r, {
+        links, artist: a.key, artistName: a.name, tabs: [sec.name], sec: sec.key, sheet: part.sheet || "",
+        id: a.key + "|" + k,
+        title: lines[0] || r.name, sub: lines.slice(1).join(" "),
+        q1: firstLine(r.quality), a1: firstLine(r.available), t1: firstLine(r.type)
+      });
+      m.nameN = nameN;
+      m.titleN = norm(m.title);
+      m.hay = [nameN, norm(r.era), norm(r.type), norm(r.quality), norm(r.available), norm(a.name)].join(" | ");
+      m.notesN = norm(r.notes);
+
+      by.set(k, m);
+      t.rows.push(m);
+    });
+  });
+}
+
+async function loadSection(a, s, i, t) {
+  const cacheKey = a.key + "|" + s.key;
+  const cached = await idb.get(cacheKey);
+  let have = false;
+
+  if (cached && cached.rows) {
+    t.parts[i] = cached; have = true;
+    buildRows(t, a); dataChanged(a.key);
+  }
+
+  if (!cached || Date.now() - cached.at > 10 * 60 * 1000) {
+    try {
+      const res = await fetch(`${API}/tracker-rows?artist=${encodeURIComponent(a.key)}&section=${encodeURIComponent(s.key)}`);
+      if (!res.ok) throw new Error(res.status);
+      const data = await res.json();
+
+      if (Array.isArray(data.rows) && (data.rows.length || !have)) {
+        const part = { at: Date.now(), rows: data.rows, sheet: data.sheet || "" };
+        t.parts[i] = part;
+        if (data.rows.length) idb.set(cacheKey, part);
+        buildRows(t, a);
+      }
+    } catch (err) {
+      if (!have) t.failed++;
+    }
+  }
+
+  t.done++;
+  dataChanged(a.key);
+}
+
+function loadTracker(key) {
+  let t = trackers.get(key);
+  if (t) return t.promise;
+
+  const a = state.byKey[key];
+  t = { parts: [], rows: [], done: 0, total: a.sections.length, failed: 0 };
+  trackers.set(key, t);
+  t.promise = Promise.all(a.sections.map((s, i) => loadSection(a, s, i, t))).then(() => t);
+  return t.promise;
+}
+
+async function loadCovers(key, tries = 0) {
+  if (covers[key] && !covers[key].pending) return;
+  try {
+    const data = await (await fetch(`${API}/covers?artist=${encodeURIComponent(key)}`)).json();
+    const map = data.covers || {}, low = {};
+    Object.keys(map).forEach(era => { low[era.toLowerCase().trim()] = map[era]; });
+    covers[key] = { map, low, pending: Boolean(data.pending) };
+    paintThumbs();
+    if (data.pending && tries < 10) setTimeout(() => loadCovers(key, tries + 1), 4000);
+  } catch (err) {}
+}
+
+function coverUrl(artist, era) {
+  const c = covers[artist];
+  if (!c || !era) return "";
+  const url = c.map[era] || c.low[String(era).toLowerCase().trim()] || "";
+  return url && url[0] === "/" ? API + url : url;
+}
+
+let allQueue = null;
+function loadEverything() {
+  if (allQueue) return;
+  const keys = state.artists.map(a => a.key);
+  let next = 0;
+  const worker = async () => { while (next < keys.length) await loadTracker(keys[next++]); };
+  allQueue = Promise.all([worker(), worker(), worker()]);
+}
+
+let changeTimer = 0;
+function dataChanged(key) {
+  if (!state.all && key !== state.artist) return;
+  clearTimeout(changeTimer);
+  changeTimer = setTimeout(() => refresh(true), 60);
+}
+
+/* ---------------------------------------------------------------- searching */
+function pool() {
+  if (!state.all) { const t = trackers.get(state.artist); return t ? t.rows : []; }
+  const out = [];
+  state.artists.forEach(a => { const t = trackers.get(a.key); if (t) for (const r of t.rows) out.push(r); });
+  return out;
+}
+
+function compute() {
+  const qn = norm(state.q), f = state.f, out = [];
+  tokens = qn ? qn.split(" ") : [];
+
+  for (const r of pool()) {
+    if (f.tab && !r.tabs.includes(f.tab)) continue;
+    if (f.era && r.era !== f.era) continue;
+    if (f.quality && r.q1 !== f.quality) continue;
+    if (f.avail && r.a1 !== f.avail) continue;
+    if (f.type && r.t1 !== f.type) continue;
+    if (f.file && !r.links.length) continue;
+    if (!tokens.length) { r._n = false; out.push(r); continue; }
+
+    let inTitle = true, inName = true, inHay = true, miss = false;
+    for (const t of tokens) {
+      if (!r.titleN.includes(t)) inTitle = false;
+      if (!r.nameN.includes(t)) inName = false;
+      if (!r.hay.includes(t)) { inHay = false; if (!r.notesN.includes(t)) { miss = true; break; } }
+    }
+    if (miss) continue;
+
+    r._s = r.titleN === qn ? 100 : r.titleN.startsWith(qn) ? 90 : (" " + r.titleN).includes(" " + qn) ? 80
+      : inTitle ? 70 : inName ? 55 : inHay ? 40 : 10;
+    r._n = r._s === 10;
+    out.push(r);
+  }
+
+  if (tokens.length) out.sort((a, b) => b._s - a._s);
+  return out;
+}
+
+function hl(text) {
+  if (!tokens.length) return esc(text);
+  const re = new RegExp("(" + tokens.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "gi");
+  return String(text).split(re).map((p, i) => i % 2 ? "<mark>" + esc(p) + "</mark>" : esc(p)).join("");
+}
+
+function snippet(notes) {
+  const low = notes.toLowerCase();
+  let at = -1;
+  for (const t of tokens) { at = low.indexOf(t); if (at >= 0) break; }
+  const start = Math.max(0, at - 36);
+  return (start ? "…" : "") + notes.slice(start, start + 150).replace(/\s+/g, " ");
+}
+
+function tone(r) {
+  const a = (r.a1 || "").toLowerCase();
+  if (/og file|full|lossless|stem/.test(a)) return "g";
+  if (/tagged|partial/.test(a)) return "o";
+  if (/snippet|beat only/.test(a)) return "y";
+  if (r.links.length && !a) return "g";
+  return "";
+}
+
+/* ---------------------------------------------------------------- rendering */
+function thumb(r, cls) {
+  const img = state.all && !cls ? state.photos[r.artist] : coverUrl(r.artist, r.era);
+  const label = r.era || r.artistName;
+  return `<span class="thumb ${cls || ""}${state.all && !cls ? " round" : ""}" style="--h:${hue(label)}" data-a="${esc(r.artist)}" data-e="${esc(r.era)}">${esc(initials(label))}${
+    img ? `<img loading="lazy" decoding="async" alt="" src="${esc(img)}" onerror="this.remove()">` : ""}</span>`;
+}
+
+function paintThumbs() {
+  document.querySelectorAll(".thumb[data-e]").forEach(el => {
+    if (el.classList.contains("round") || el.querySelector("img")) return;
+    const url = coverUrl(el.dataset.a, el.dataset.e);
+    if (url) el.insertAdjacentHTML("beforeend", `<img loading="lazy" decoding="async" alt="" src="${esc(url)}" onerror="this.remove()">`);
+  });
+}
+
+function rowHtml(r, i, kind) {
+  const meta = [state.all || kind === "saved" ? r.artistName : "", r.era, r.q1, r.a1].filter(Boolean).join(" · ");
+  return `<button class="row" data-${kind || "i"}="${i}">${thumb(r)}<span class="body"><span class="rt">
+    <div class="t">${hl(r.title)}</div>
+    ${r.sub ? `<div class="s">${hl(r.sub)}</div>` : ""}
+    <div class="m"><i class="dot ${tone(r)}"></i><span>${hl(meta) || "No details"}</span></div>
+    ${r._n && kind !== "saved" ? `<div class="n">${hl(snippet(r.notes))}</div>` : ""}
+  </span>${r.length ? `<span class="rr">${esc(firstLine(r.length))}</span>` : ""}${ICON.chev}</span></button>`;
+}
+
+function skeleton() {
+  let rows = "";
+  for (let i = 0; i < 9; i++) rows += `<div class="row"><span class="thumb"></span><span class="body"><span class="rt"><i style="width:${46 + (i * 17) % 40}%"></i><i style="width:${28 + (i * 11) % 30}%"></i></span></span></div>`;
+  return `<div class="sec-h"><span>Loading tracker</span></div><div class="group skel">${rows}</div>`;
+}
+
+function eraList(rows) {
+  const eras = new Map();
+  rows.forEach(r => { if (r.era) eras.set(r.era, (eras.get(r.era) || 0) + 1); });
+  return [...eras].map(([era, count]) => ({ value: era, count }));
+}
+
+function installHint() {
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const standalone = navigator.standalone || matchMedia("(display-mode: standalone)").matches;
+  if (!ios || standalone || LS.get("hint", false)) return "";
+  return `<div class="hint" id="hint"><img src="search-icon-180.png" alt=""><div style="flex:1"><b>Add to Home Screen</b>Tap Share, then Add to Home Screen to use this like an app.</div><button id="hintX" aria-label="Dismiss">&times;</button></div>`;
+}
+
+function progressNote() {
+  if (state.all) {
+    const done = state.artists.filter(a => { const t = trackers.get(a.key); return t && t.done >= t.total; }).length;
+    return done < state.artists.length ? `Loading trackers… ${done} of ${state.artists.length}` : "";
+  }
+  const t = trackers.get(state.artist);
+  return t && t.done < t.total ? `Loading tabs… ${t.done} of ${t.total}` : "";
+}
+
+function refresh(keepScroll) {
+  const box = $("#results"), scroller = $("#scrollSearch");
+  const t = trackers.get(state.artist);
+  const rows = pool();
+  const filtered = Object.values(state.f).some(Boolean);
+  const keepShown = keepScroll ? Math.max(shown, 60) : 60;
+
+  renderChips();
+
+  if (!rows.length) {
+    const loading = state.all ? progressNote() : !t || t.done < t.total;
+    if (loading) box.innerHTML = skeleton();
+    else box.innerHTML = `<div class="empty">${ICON.search}<h2>Couldn't Load Tracker</h2><p>${
+      t && t.failed ? "The tracker didn't answer. Check your connection and try again." : "This tracker has no songs listed."}</p><button id="retry">Try Again</button></div>`;
+    return;
+  }
+
+  // nothing typed and nothing filtered: browse instead of dumping every row
+  if (!state.q.trim() && !filtered) {
+    view = [];
+    let html = installHint();
+
+    if (state.recents.length) {
+      html += `<div class="sec-h"><span>Recent</span><button id="clearRecents">Clear</button></div><div class="group plain">` +
+        state.recents.map((q, i) => `<button class="row" data-recent="${i}"><span class="thumb ic" style="width:30px;height:30px;background:none">${ICON.clock}</span><span class="body"><span class="rt"><div class="t" style="font-weight:400">${esc(q)}</div></span></span></button>`).join("") + `</div>`;
+    }
+
+    if (state.all) {
+      html += `<div class="empty">${ICON.search}<h2>Search Every Tracker</h2><p>${num(rows.length)} songs across ${trackers.size} trackers so far.</p></div>`;
+    } else {
+      const eras = eraList(rows);
+      html += `<div class="sec-h"><span>Eras</span><span>${num(rows.length)} songs</span></div><div class="group">` +
+        eras.map(e => `<button class="row" data-era="${esc(e.value)}">${thumb({ artist: state.artist, era: e.value, artistName: "" }, "era")}<span class="body"><span class="rt"><div class="t">${esc(e.value)}</div><div class="s">${num(e.count)} ${e.count === 1 ? "song" : "songs"}</div></span>${ICON.chev}</span></button>`).join("") + `</div>`;
+      if (!eras.length) html += `<div class="note">This tracker doesn't group its songs into eras. Type to search.</div>`;
+    }
+
+    const note = progressNote();
+    if (note) html += `<div class="note">${note}</div>`;
+    box.innerHTML = html;
+    if (!keepScroll) scroller.scrollTop = 0;
+    return;
+  }
+
+  view = compute();
+  shown = 0;
+
+  if (!view.length) {
+    const note = progressNote();
+    box.innerHTML = `<div class="empty">${ICON.search}<h2>No Results</h2><p>${note || (state.q.trim() ? `Nothing matches “${esc(state.q.trim())}”${filtered ? " with these filters" : ""}.` : "Nothing matches these filters.")}</p>${filtered ? `<button id="resetFilters">Clear Filters</button>` : ""}</div>`;
+    return;
+  }
+
+  const note = progressNote();
+  box.innerHTML = `<div class="sec-h"><span>${num(view.length)} ${view.length === 1 ? "result" : "results"}</span>${note ? `<span>${note}</span>` : ""}</div><div class="group" id="list"></div><div id="more" style="height:1px"></div>`;
+  appendRows(keepShown);
+  if (!keepScroll) scroller.scrollTop = 0;
+}
+
+function appendRows(count) {
+  const list = $("#list");
+  if (!list || shown >= view.length) return;
+  const end = Math.min(view.length, shown + (count || 60));
+  let html = "";
+  for (let i = shown; i < end; i++) html += rowHtml(view[i], i);
+  list.insertAdjacentHTML("beforeend", html);
+  shown = end;
+}
+
+function renderChips() {
+  const f = state.f, a = state.byKey[state.artist];
+  const chip = (key, label, value) =>
+    `<button class="chip${value ? " on" : ""}" data-chip="${key}"><span>${esc(value || label)}</span>${ICON.down}</button>`;
+  let html = "";
+  if (!state.all && a && a.sections.length > 1) html += chip("tab", "Tab", f.tab);
+  if (!state.all) html += chip("era", "Era", f.era);
+  html += chip("avail", "Availability", f.avail) + chip("quality", "Quality", f.quality) + chip("type", "Type", f.type);
+  html += `<button class="chip${f.file ? " on" : ""}" data-chip="file"><span>Has a file</span></button>`;
+  $("#chips").innerHTML = html;
+}
+
+function setHeader() {
+  const a = state.byKey[state.artist];
+  const name = state.all ? "All Trackers" : a ? a.name : "Tracker Search";
+  $("#bigTitle").textContent = name;
+  $("#navTitle").textContent = name;
+  const photo = !state.all && state.photos[state.artist];
+  $("#avatarBtn").innerHTML = state.all ? `<span style="width:20px;height:20px;display:grid;color:var(--tint)">${ICON.globe}</span>`
+    : photo ? `<img alt="" src="${esc(photo)}" onerror="this.remove()">` : esc(initials(name));
+}
+
+function renderArtists() {
+  const qn = norm($("#artistQ").value);
+  const list = state.artists.filter(a => !qn || norm(a.name).includes(qn));
+  let html = "";
+
+  if (!qn) {
+    html += `<div class="group" style="margin-bottom:22px"><button class="row" data-artist="*"><span class="thumb ic round">${ICON.globe}</span><span class="body"><span class="rt"><div class="t">All Trackers</div><div class="s">Search every artist at once</div></span>${state.all ? ICON.check : ""}</span></button></div>`;
+  }
+
+  html += list.length ? `<div class="group">` + list.map(a => {
+    const photo = state.photos[a.key];
+    return `<button class="row" data-artist="${esc(a.key)}"><span class="thumb round" style="--h:${hue(a.name)}">${esc(initials(a.name))}${photo ? `<img loading="lazy" alt="" src="${esc(photo)}" onerror="this.remove()">` : ""}</span><span class="body"><span class="rt"><div class="t">${esc(a.name)}</div><div class="s">${esc(a.sections.map(s => s.name).join(" · "))}</div></span>${!state.all && a.key === state.artist ? ICON.check : ICON.chev}</span></button>`;
+  }).join("") + `</div>` : `<div class="empty"><h2>No Artist Found</h2><p>That artist doesn't have a tracker here yet.</p></div>`;
+
+  $("#artistList").innerHTML = html;
+}
+
+function renderSaved() {
+  $("#savedList").innerHTML = state.saved.length
+    ? `<div class="sec-h"><span>${num(state.saved.length)} saved</span></div><div class="group">${state.saved.map((r, i) => rowHtml(r, i, "saved")).join("")}</div>`
+    : `<div class="empty"><svg viewBox="0 0 52 52" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"><path d="M26 7l5.800 12 13.200 1.700-9.600 9.200 2.400 13.100L26 36.600 14.200 43l2.400-13.100L7 20.700 20.200 19z"/></svg><h2>Nothing Saved</h2><p>Open a song and tap Save to keep it here.</p></div>`;
+  paintThumbs();
+}
+
+/* ---------------------------------------------------------------- sheets */
+let sheetOpen = false;
+function openSheet({ title, body, tall, left, onLeft }) {
+  $("#sheetTitle").textContent = title || "";
+  $("#sheetBody").innerHTML = body;
+  $("#sheetBody").scrollTop = 0;
+  $("#sheetLeft").textContent = left || "";
+  $("#sheetLeft").onclick = onLeft || null;
+  $("#sheet").classList.toggle("tall", Boolean(tall));
+  $("#sheet").style.transform = "";
+  sheetOpen = true;
+  requestAnimationFrame(() => { if (!sheetOpen) return; $("#sheet").classList.add("on"); $("#backdrop").classList.add("on"); });
+  document.activeElement && document.activeElement.blur();
+}
+
+function closeSheet() {
+  $("#sheet").style.transform = "";
+  $("#sheet").classList.remove("on", "drag");
+  $("#backdrop").classList.remove("on");
+  sheetOpen = false;
+}
+
+function isSaved(r) { return state.saved.some(s => s.id === r.id); }
+
+function openDetail(r) {
+  const a = state.byKey[r.artist];
+  const sheetLink = r.sheet ? `${r.sheet}&range=A${r.row}` : "";
+  const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return url; } };
+  const kv = [["Era", r.era], ["Type", r.type], ["Quality", r.quality], ["Available", r.available], ["Length", r.length], ["Date", r.date], ["Tab", r.tabs.join(", ")], ["Tracker", r.artistName], ["Sheet row", r.row]]
+    .filter(p => String(p[1] || "").trim());
+
+  const body = `
+    <div class="hero">${thumb(r, "big")}<div style="min-width:0"><h2>${esc(r.title)}</h2>${r.sub ? `<p>${esc(r.sub)}</p>` : ""}<p class="era">${esc([r.artistName, r.era].filter(Boolean).join(" · "))}</p></div></div>
+    <div class="pills">${[r.a1, r.q1, r.t1].filter(Boolean).map((p, i) => `<span class="pill">${i === 0 && r.a1 ? `<i class="dot ${tone(r)}"></i>` : ""}${esc(p)}</span>`).join("")}${r.links.length ? "" : `<span class="pill">No file</span>`}</div>
+    <div class="actions">
+      ${r.links.length ? `<button class="act primary" data-open="${esc(r.links[0])}">${r.play ? ICON.play + "Open File" : ICON.link + "Open Link"}</button>` : ""}
+      <button class="act" id="saveBtn">${isSaved(r) ? ICON.starOn + "Saved" : ICON.star + "Save"}</button>
+      ${sheetLink ? `<button class="act" data-open="${esc(sheetLink)}">${ICON.sheet}Sheet</button>` : ""}
+      <button class="act" id="shareBtn">${ICON.share}Share</button>
+    </div>
+    ${r.notes ? `<div class="sec-h"><span>Notes</span></div><div class="notes">${hl(r.notes)}</div>` : ""}
+    ${r.links.length ? `<div class="sec-h"><span>${r.links.length === 1 ? "Link" : "Links"}</span></div><div class="group plain lnk">${r.links.map(l => `<div class="row" style="padding-left:16px"><span class="body"><button class="rt" data-open="${esc(l)}"><div class="t">${esc(host(l))}</div><div class="s">${esc(l.replace(/^https?:\/\//, ""))}</div></button><button class="copy" data-copy="${esc(l)}">Copy</button></span></div>`).join("")}</div>` : ""}
+    <div class="sec-h"><span>Details</span></div>
+    <div class="group kv">${kv.map(p => `<div class="row"><span class="body"><span class="k">${p[0]}</span><span class="v">${esc(String(p[1]).replace(/\n+/g, " · "))}</span></span></div>`).join("")}</div>`;
+
+  openSheet({ title: "", body, tall: true });
+
+  $("#saveBtn").onclick = () => {
+    if (isSaved(r)) state.saved = state.saved.filter(s => s.id !== r.id);
+    else {
+      const keep = {};
+      ["id", "artist", "artistName", "era", "name", "title", "sub", "notes", "length", "type", "quality", "available", "date", "links", "row", "play", "tabs", "sec", "sheet", "q1", "a1", "t1"].forEach(k => { keep[k] = r[k]; });
+      state.saved.unshift(keep);
+    }
+    LS.set("saved", state.saved);
+    $("#saveBtn").innerHTML = isSaved(r) ? ICON.starOn + "Saved" : ICON.star + "Save";
+    toast(isSaved(r) ? "Saved" : "Removed");
+    renderSaved();
+  };
+
+  $("#shareBtn").onclick = async () => {
+    const url = `${location.origin}${location.pathname}?artist=${encodeURIComponent(r.artist)}&q=${encodeURIComponent(r.title)}`;
+    const text = `${r.title} — ${[r.artistName, r.era].filter(Boolean).join(", ")}`;
+    try { if (navigator.share) return await navigator.share({ title: r.title, text, url }); } catch (e) { return; }
+    copy(url);
+  };
+
+  if (a) loadCovers(r.artist);
+}
+
+function openPicker(key) {
+  const f = state.f, rows = pool(), a = state.byKey[state.artist];
+  const titles = { tab: "Tab", era: "Era", avail: "Availability", quality: "Quality", type: "Type" };
+  const field = { avail: "a1", quality: "q1", type: "t1" }[key];
+  let options;
+
+  if (key === "tab") {
+    options = a.sections.map(s => ({ value: s.name, count: rows.filter(r => r.tabs.includes(s.name)).length }));
+  } else if (key === "era") {
+    options = eraList(rows);
+  } else {
+    const counts = new Map();
+    rows.forEach(r => { if (r[field]) counts.set(r[field], (counts.get(r[field]) || 0) + 1); });
+    options = [...counts].map(([value, count]) => ({ value, count })).sort((x, y) => y.count - x.count).slice(0, 40);
+  }
+
+  sheetRows = options;
+  const item = (o, i) => `<button class="row" data-pick="${i}" data-n="${esc(norm(o.value))}">${key === "era" ? thumb({ artist: state.artist, era: o.value, artistName: "" }, "era") : ""}<span class="body"><span class="rt"><div class="t" style="font-weight:400">${esc(o.value)}</div></span><span class="rr">${num(o.count)}</span>${f[key] === o.value ? ICON.check : ""}</span></button>`;
+  const body = (options.length > 12 ? `<label class="field"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="6.7" cy="6.7" r="4.9"/><path d="M10.5 10.500 14.400 14.400"/></svg><input id="pickQ" type="search" autocomplete="off" spellcheck="false" placeholder="Filter"></label>` : "") +
+    `<div class="group plain" style="margin-bottom:14px"><button class="row" data-pick="-1" style="padding-left:16px"><span class="body"><span class="rt"><div class="t" style="font-weight:400">All</div></span>${f[key] ? "" : ICON.check}</span></button></div>` +
+    (options.length ? `<div class="group${key === "era" ? "" : " plain"}" id="pickList">${options.map(item).join("")}</div>` : `<div class="note">Nothing to filter by yet.</div>`);
+
+  openSheet({ title: titles[key], body, tall: options.length > 12 });
+  $("#sheetBody").dataset.key = key;
+  if (key !== "era") document.querySelectorAll("#pickList .row").forEach(el => { el.style.paddingLeft = "16px"; });
+
+  const pickQ = $("#pickQ");
+  if (pickQ) pickQ.oninput = () => {
+    const qn = norm(pickQ.value);
+    document.querySelectorAll("#pickList .row").forEach(el => { el.hidden = Boolean(qn) && !el.dataset.n.includes(qn); });
+  };
+}
+
+let toastTimer = 0;
+function toast(text) {
+  const el = $("#toast");
+  el.textContent = text;
+  el.classList.add("on");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove("on"), 1500);
+}
+
+async function copy(text) {
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const box = document.createElement("textarea");
+    box.value = text; document.body.appendChild(box); box.select();
+    try { document.execCommand("copy"); } catch (err) {}
+    box.remove();
+  }
+  toast("Copied");
+}
+
+/* ---------------------------------------------------------------- actions */
+function selectArtist(key, opts = {}) {
+  state.all = key === "*";
+  if (!state.all) { state.artist = key; LS.set("artist", key); }
+  LS.set("all", state.all);
+  state.f = { tab: "", era: "", quality: "", avail: "", type: "", file: state.f.file };
+  if (!opts.keepQuery) { state.q = ""; $("#q").value = ""; $("#clearQ").hidden = true; }
+
+  setHeader();
+  renderArtists();
+  syncUrl();
+
+  if (state.all) loadEverything();
+  else { loadTracker(key); loadCovers(key); }
+  refresh();
+}
+
+function syncUrl() {
+  try {
+    const url = new URL(location.href);
+    url.searchParams.set("artist", state.all ? "all" : state.artist);
+    state.q.trim() ? url.searchParams.set("q", state.q.trim()) : url.searchParams.delete("q");
+    history.replaceState(null, "", url);
+  } catch (e) {}
+}
+
+function remember() {
+  const q = state.q.trim();
+  if (q.length < 2) return;
+  state.recents = [q, ...state.recents.filter(x => x.toLowerCase() !== q.toLowerCase())].slice(0, 8);
+  LS.set("recents", state.recents);
+}
+
+function showTab(name) {
+  ["search", "trackers", "saved"].forEach(t => { $("#v-" + t).hidden = t !== name; });
+  document.querySelectorAll(".tab").forEach(el => el.classList.toggle("on", el.dataset.tab === name));
+  if (name === "saved") renderSaved();
+}
+
+/* ---------------------------------------------------------------- wiring */
+let typing = 0;
+$("#q").addEventListener("input", e => {
+  state.q = e.target.value;
+  $("#clearQ").hidden = !state.q;
+  clearTimeout(typing);
+  typing = setTimeout(() => { refresh(); syncUrl(); }, 110);
+});
+$("#q").addEventListener("focus", () => $("#v-search").classList.add("searching"));
+$("#q").addEventListener("blur", () => { remember(); if (!state.q) $("#v-search").classList.remove("searching"); });
+$("#q").addEventListener("keydown", e => { if (e.key === "Enter") e.target.blur(); });
+$("#clearQ").addEventListener("mousedown", e => e.preventDefault());
+$("#clearQ").addEventListener("click", () => { state.q = ""; $("#q").value = ""; $("#clearQ").hidden = true; refresh(); syncUrl(); $("#q").focus(); });
+$("#cancelQ").addEventListener("click", () => {
+  state.q = ""; $("#q").value = ""; $("#clearQ").hidden = true; $("#q").blur();
+  $("#v-search").classList.remove("searching"); refresh(); syncUrl();
+});
+$("#artistQ").addEventListener("input", renderArtists);
+$("#avatarBtn").addEventListener("click", () => showTab("trackers"));
+
+document.querySelectorAll(".scroll").forEach(el => el.addEventListener("scroll", () => {
+  el.parentElement.classList.toggle("scrolled", el.scrollTop > 40);
+  if (el.id === "scrollSearch") {
+    if (document.activeElement === $("#q") && el.scrollTop > 60) $("#q").blur();
+    if (el.scrollTop + el.clientHeight > el.scrollHeight - 900) appendRows();
+  }
+}, { passive: true }));
+
+document.querySelector(".tabbar").addEventListener("click", e => {
+  const tab = e.target.closest(".tab");
+  if (!tab) return;
+  // tapping the tab you are on scrolls it to the top, as iOS does
+  if (tab.classList.contains("on")) $("#v-" + tab.dataset.tab + " .scroll").scrollTo({ top: 0, behavior: "smooth" });
+  showTab(tab.dataset.tab);
+});
+
+$("#chips").addEventListener("click", e => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  if (chip.dataset.chip === "file") { state.f.file = !state.f.file; refresh(); return; }
+  openPicker(chip.dataset.chip);
+});
+
+$("#results").addEventListener("click", e => {
+  if (e.target.closest("#hintX")) { LS.set("hint", true); $("#hint").remove(); return; }
+  if (e.target.closest("#clearRecents")) { state.recents = []; LS.set("recents", []); refresh(); return; }
+  if (e.target.closest("#resetFilters")) { state.f = { tab: "", era: "", quality: "", avail: "", type: "", file: false }; refresh(); return; }
+  if (e.target.closest("#retry")) { trackers.delete(state.artist); loadTracker(state.artist); refresh(); return; }
+
+  const row = e.target.closest(".row");
+  if (!row) return;
+  if (row.dataset.i) { remember(); openDetail(view[Number(row.dataset.i)]); }
+  else if (row.dataset.era != null) { state.f.era = row.dataset.era; refresh(); }
+  else if (row.dataset.recent) {
+    state.q = state.recents[Number(row.dataset.recent)] || "";
+    $("#q").value = state.q; $("#clearQ").hidden = !state.q;
+    $("#v-search").classList.add("searching"); refresh(); syncUrl();
+  }
+});
+
+$("#artistList").addEventListener("click", e => {
+  const row = e.target.closest(".row");
+  if (!row) return;
+  $("#artistQ").value = "";
+  selectArtist(row.dataset.artist);
+  showTab("search");
+});
+
+$("#savedList").addEventListener("click", e => {
+  const row = e.target.closest(".row");
+  if (row) openDetail(state.saved[Number(row.dataset.saved)]);
+});
+
+$("#sheetBody").addEventListener("click", e => {
+  const open = e.target.closest("[data-open]");
+  if (open) { window.open(open.dataset.open, "_blank", "noopener"); return; }
+  const cp = e.target.closest("[data-copy]");
+  if (cp) { copy(cp.dataset.copy); return; }
+  const pick = e.target.closest("[data-pick]");
+  if (pick) {
+    const i = Number(pick.dataset.pick);
+    state.f[$("#sheetBody").dataset.key] = i < 0 ? "" : sheetRows[i].value;
+    closeSheet(); refresh();
+  }
+});
+
+$("#sheetDone").addEventListener("click", closeSheet);
+$("#backdrop").addEventListener("click", closeSheet);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetOpen) closeSheet(); });
+
+// pull the sheet down by its handle to dismiss it
+(() => {
+  const head = $("#sheetHead"), sheet = $("#sheet");
+  let startY = null, dy = 0;
+  head.addEventListener("pointerdown", e => { if (e.target.closest("button")) return; startY = e.clientY; dy = 0; sheet.classList.add("drag"); head.setPointerCapture(e.pointerId); });
+  head.addEventListener("pointermove", e => { if (startY == null) return; dy = Math.max(0, e.clientY - startY); sheet.style.transform = `translateY(${dy}px)`; });
+  const end = () => {
+    if (startY == null) return;
+    startY = null; sheet.classList.remove("drag");
+    if (dy > 110) closeSheet(); else sheet.style.transform = "";
+  };
+  head.addEventListener("pointerup", end);
+  head.addEventListener("pointercancel", end);
+})();
+
+/* ---------------------------------------------------------------- start */
+(async function start() {
+  $("#results").innerHTML = skeleton();
+  renderChips();
+
+  try {
+    const cachedList = LS.get("artists", null);
+    const fetching = fetch(`${API}/artists`).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => { LS.set("artists", data); return data; });
+    const data = cachedList || await fetching;
+    if (cachedList) fetching.catch(() => {});
+
+    state.artists = data.artists || [];
+    state.artists.forEach(a => { state.byKey[a.key] = a; });
+
+    const params = new URLSearchParams(location.search);
+    const asked = (params.get("artist") || "").toLowerCase();
+    const q = params.get("q") || "";
+    const wantAll = asked === "all" || (!asked && LS.get("all", false));
+    if (!state.byKey[state.artist]) state.artist = data.defaultArtist && state.byKey[data.defaultArtist] ? data.defaultArtist : (state.artists[0] || {}).key;
+    if (state.byKey[asked]) state.artist = asked;
+
+    if (q) { state.q = q; $("#q").value = q; $("#clearQ").hidden = false; $("#v-search").classList.add("searching"); }
+    selectArtist(wantAll ? "*" : state.artist, { keepQuery: true });
+  } catch (err) {
+    $("#bigTitle").textContent = "Tracker Search";
+    $("#results").innerHTML = `<div class="empty">${ICON.search}<h2>Can't Reach Trackers</h2><p>Check your connection and try again.</p><button onclick="location.reload()">Try Again</button></div>`;
+    return;
+  }
+
+  state.photos = LS.get("photos", {});
+  setHeader(); renderArtists();
+  fetch(`${API}/artist-pics`).then(r => r.json()).then(data => {
+    state.photos = data.photos || {};
+    LS.set("photos", state.photos);
+    setHeader(); renderArtists();
+    if (state.all) refresh(true);
+  }).catch(() => {});
+})();
+</script>
+</body>
+</html>
