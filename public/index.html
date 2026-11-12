@@ -378,9 +378,21 @@ function buildRows(t, a) {
   const by = new Map();
   t.rows = [];
 
+  /*
+    Only the song sections say what an artist's eras are. Other sections reuse
+    that column for something else - a Media section files rows under "Triller"
+    and "Fortnite" - and those are not eras. The song sections are the ones
+    artists.json names; a tracker added by hand goes by Unreleased / Released.
+  */
+  const named = a.sections || [];
+  const isSongs = sec => named.length
+    ? named.some(s => (s.gid && s.gid === sec.gid) || s.key === sec.id || norm(s.name) === norm(sec.name))
+    : /^(unreleased|released)/i.test(sec.name);
+
   t.parts.forEach((part, i) => {
     if (!part) return;
     const sec = t.sections[i];
+    const core = isSongs(sec);
 
     part.rows.forEach((r, at) => {
       const nameN = norm(r.name);
@@ -391,13 +403,14 @@ function buildRows(t, a) {
       // plenty of sections re-list the same songs: one row, several sections
       if (had) {
         if (!had.tabs.includes(sec.name)) had.tabs.push(sec.name);
+        if (core) had.core = true;
         if (!had.notes && r.notes) { had.notes = r.notes; had.body = r.notes; had.notesN = norm(r.notes); }
         return;
       }
 
       const lines = String(r.name).split("\n").map(x => x.trim()).filter(Boolean);
       const m = Object.assign({}, r, {
-        links, artist: a.key, artistName: a.name, tabs: [sec.name], gid: sec.gid || "", sheet: part.sheet || "",
+        links, artist: a.key, artistName: a.name, tabs: [sec.name], core, gid: sec.gid || "", sheet: part.sheet || "",
         id: a.key + "|" + k,
         title: lines[0] || r.name, sub: lines.slice(1).join(" "),
         q1: firstLine(r.quality), a1: firstLine(r.available), t1: firstLine(r.type)
@@ -460,7 +473,7 @@ async function loadSection(a, s, i, t) {
 
 // every section the sheet has, read off the sheet itself
 async function listSections(a) {
-  const shape = tabs => tabs.filter(tab => !/social/i.test(tab.name)).map(tab => ({ id: "g" + tab.gid, name: tab.name, gid: tab.gid, param: "gid=" + tab.gid + "&name=" + encodeURIComponent(tab.name) }));
+  const shape = tabs => tabs.map(tab => ({ id: "g" + tab.gid, name: tab.name, gid: tab.gid, param: "gid=" + tab.gid + "&name=" + encodeURIComponent(tab.name) }));
   const cached = LS.get("tabs." + a.key, null);
 
   const fetching = fetch(API + "/tabs?" + reqArtist(a))
@@ -612,7 +625,10 @@ function skeleton() {
 
 function eraList(rows) {
   const eras = new Map();
-  rows.forEach(r => { if (r.era && !r.g) eras.set(r.era, (eras.get(r.era) || 0) + 1); });
+  // eras come from the song sections; if a tracker has none we can tell apart, from everything
+  const real = new Set();
+  rows.forEach(r => { if (r.core && r.era && !r.g) real.add(r.era); });
+  rows.forEach(r => { if (r.era && !r.g && (!real.size || real.has(r.era))) eras.set(r.era, (eras.get(r.era) || 0) + 1); });
   return [...eras].map(([era, count]) => ({ value: era, count }));
 }
 
