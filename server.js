@@ -1045,6 +1045,8 @@ const COLUMN_ALIASES = {
   era: ["era", "rel. era", "rel era", "release era", "released era"],
   name: ["name", "song", "song name", "title", "track"],
   notes: ["notes"],
+  // a Tracklists tab writes each project's songs in a column of its own
+  tracklist: ["tracklist", "track list", "tracklists", "track listing"],
   length: ["track length", "length", "song length"],
   type: ["type"],
   quality: ["quality"],
@@ -1521,6 +1523,7 @@ async function loadSongs(artist, section) {
 
     const nameIndex = findColumn(headers, "name");
     const notesIndex = findColumn(headers, "notes");
+    const tracklistIndex = findColumn(headers, "tracklist");
     const lengthIndex = findColumn(headers, "length");
     const typeIndex = findColumn(headers, "type");
     const qualityIndex = findColumn(headers, "quality");
@@ -1660,6 +1663,7 @@ async function loadSongs(artist, section) {
           link: getPlayableLink(originalLink)
         }, {
           rowLinks: { value: rowLinks },
+          tracklist: { value: tracklistIndex >= 0 && tracklistIndex !== nameIndex ? row[tracklistIndex] || "" : "" },
           rowNumber: { value: rowNumber },
           rowIndex: { value: index }
         });
@@ -1687,8 +1691,9 @@ async function loadSongs(artist, section) {
         first(song.name) &&
         !headingRows.has(song.rowIndex) &&
         (song.rowLinks.length || first(song.type) || first(song.quality) ||
-          first(song.availableLength) || first(song.length)))
+          first(song.availableLength) || first(song.length) || first(song.tracklist)))
       .map(song => ({
+        tracklist: first(song.tracklist) || undefined,
         era: first(song.era),
         name: first(song.name),
         notes: first(song.notes),
@@ -2165,6 +2170,71 @@ app.get("/row-image", async (req, res) => {
     res.set("Content-Type", image.type);
     res.set("Cache-Control", "public, max-age=86400");
     res.send(image.body);
+  } catch (err) {
+    res.status(502).send("Could not fetch that picture.");
+  }
+});
+
+/*
+  The picture one row of an Art tab links to. The row is named by its tab and
+  row number rather than by address, so this cannot be pointed at anything the
+  sheet does not itself link. A direct file is handed straight to the browser;
+  a link to an image's page is read once for the file behind it.
+*/
+const artImageCache = new Map();
+
+async function resolveArtLink(link) {
+  const url = String(link || "").trim();
+  if (!/^https?:\/\//i.test(url)) return null;
+  if (artImageCache.has(url)) return artImageCache.get(url);
+
+  const drive = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:[^#]*&)?id=)([A-Za-z0-9_-]{10,})/i);
+  let image = drive ? `https://drive.google.com/thumbnail?id=${drive[1]}&sz=w1600` : toDirectImage(url);
+
+  if (!image) {
+    try {
+      const response = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, redirect: "follow", timeout: 8000 });
+      const type = (response.headers.get("content-type") || "").toLowerCase();
+
+      if (response.ok && /^image\//.test(type)) {
+        image = url;
+        if (response.body && response.body.destroy) response.body.destroy();
+      } else if (response.ok && /html/.test(type)) {
+        image = extractImageFromPage(await response.text());
+      }
+    } catch (err) {
+      // a page that will not load just means no picture for that row
+    }
+  }
+
+  if (artImageCache.size > 5000) artImageCache.clear();
+  artImageCache.set(url, image || null);
+  return image || null;
+}
+
+app.get("/art-image", async (req, res) => {
+  try {
+    const artist = getArtist(req.query.artist, req.query.custom);
+    const gid = String(req.query.gid || "");
+    const rowNumber = Number(req.query.row);
+    if (!/^\d{1,12}$/.test(gid) || !Number.isInteger(rowNumber) || rowNumber < 1) return res.status(400).send("Bad request.");
+
+    const known = artist.custom ? null : Object.values(artist.sections).find(item => item.gid === gid);
+    const section = known || { name: String(req.query.name || "Art").slice(0, 80), gid };
+    const rows = await loadTabRows(artist, section, Boolean(known), false);
+    const row = rows.find(item => item.row === rowNumber);
+
+    for (const link of (row && row.links) || []) {
+      const image = await resolveArtLink(link);
+      if (!image) continue;
+
+      res.set("Cache-Control", "public, max-age=86400");
+      res.set("Referrer-Policy", "no-referrer");
+      return res.redirect(302, image);
+    }
+
+    res.set("Cache-Control", "public, max-age=600");
+    res.status(404).send("No picture in that row.");
   } catch (err) {
     res.status(502).send("Could not fetch that picture.");
   }

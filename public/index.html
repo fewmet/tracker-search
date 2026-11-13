@@ -206,6 +206,8 @@
   .kv .k { flex: none; font-size: 16px; max-width: 45%; }
   .kv .row .body { padding-top: 10px; padding-bottom: 10px; align-items: flex-start; }
   .kv .v { flex: 1; min-width: 0; text-align: right; color: var(--label-2); font-size: 16px; -webkit-user-select: text; user-select: text; word-break: break-word; }
+  .artbig { display: block; width: calc(100% - 32px); margin: 16px 16px 0; border-radius: 12px; overflow: hidden; background: var(--fill); }
+  .artbig img { display: block; width: 100%; height: auto; min-height: 120px; }
   .lnk .t { color: var(--tint); font-weight: 400; }
   .lnk .copy { flex: none; color: var(--tint); font-size: 15px; padding: 8px 2px 8px 10px; }
 
@@ -368,6 +370,9 @@ const covers = {};            // artist key -> { map, low }
 const keyTabs = {};           // artist key -> the sheet's Key tab, if it has one
 const keys = {};              // artist key -> the glossary read from it
 const KEY_TAB = /(^|[^a-z])key([^a-z]|$)/i;
+const ART_TAB = /(^|[^a-z])art(work)?s?([^a-z]|$)/i;   // a tab whose rows each link to a picture
+const TRACKLIST_COL = /^track ?list/i;
+const ROWS_V = 2;             // bumped when the server starts sending more per row
 let view = [], shown = 0, tokens = [], sheetRows = null;
 
 /* ---------------------------------------------------------------- loading */
@@ -407,6 +412,7 @@ function buildRows(t, a) {
       if (had) {
         if (!had.tabs.includes(sec.name)) had.tabs.push(sec.name);
         if (core) had.core = true;
+        if (!had.art) had.art = artOf(sec, r, a);
         if (!had.notes && r.notes) { had.notes = r.notes; had.body = r.notes; had.notesN = norm(r.notes); }
         return;
       }
@@ -418,10 +424,16 @@ function buildRows(t, a) {
         title: lines[0] || r.name, sub: lines.slice(1).join(" "),
         q1: firstLine(r.quality), a1: firstLine(r.available), t1: firstLine(r.type)
       });
+      m.art = artOf(sec, r, a);
+      // a tab read cell by cell keeps its Tracklist column among the labelled cells
+      if (!m.tracklist && r.fields) {
+        const listed = r.fields.filter(f => TRACKLIST_COL.test(f[0]));
+        if (listed.length) { m.tracklist = listed.map(f => f[1]).join("\n"); m.fields = r.fields.filter(f => !TRACKLIST_COL.test(f[0])); }
+      }
       // a row from a section that is not a song list: its cells stand in for notes
       if (r.g && m.title.length > 60) { m.notes = r.name; m.title = r.era || sec.name; m.sub = firstLine(r.name); }
-      if (r.g && !m.sub) m.sub = (r.fields || []).slice(0, 2).map(f => firstLine(f[1])).join(" · ").slice(0, 160);
-      m.body = (m.notes ? m.notes + "\n" : "") + (r.fields || []).map(f => f[1]).join("\n");
+      if (r.g && !m.sub) m.sub = (m.fields || []).slice(0, 2).map(f => firstLine(f[1])).join(" · ").slice(0, 160);
+      m.body = (m.notes ? m.notes + "\n" : "") + (m.tracklist ? m.tracklist + "\n" : "") + (m.fields || []).map(f => f[1]).join("\n");
       m.nameN = nameN;
       m.titleN = norm(m.title);
       m.hay = [nameN, norm(r.era), norm(r.type), norm(r.quality), norm(r.available)].join(" | ");
@@ -455,6 +467,19 @@ function buildRows(t, a) {
     }));
 }
 
+// the picture an Art tab's row links to, asked for by tab and row
+function artOf(sec, r, a) {
+  if (r.g || !r.row || !sec.gid || !(r.links || []).length || !ART_TAB.test(sec.name)) return "";
+  return "/art-image?" + reqArtist(a) + "&gid=" + sec.gid + "&row=" + r.row;
+}
+
+// a row's own picture: the art it links to, or one sitting in its cells
+function rowPic(r) {
+  if (r.art) return API + r.art;
+  const a = state.byKey[r.artist];
+  return r.img != null && a && r.gid ? API + "/row-image?" + reqArtist(a) + "&gid=" + r.gid + "&i=" + r.img : "";
+}
+
 // a tracker can have thirty-odd sections; only a few are fetched at a time
 let running = 0;
 const waiting = [];
@@ -466,12 +491,12 @@ async function loadSection(a, s, i, t) {
   const cached = await idb.get(cacheKey);
   let have = false;
 
-  if (cached && cached.rows) {
+  if (cached && cached.rows && (cached.v === ROWS_V || !navigator.onLine)) {
     t.parts[i] = cached; have = true;
     buildRows(t, a); dataChanged(a.key);
   }
 
-  if (!cached || Date.now() - cached.at > 10 * 60 * 1000) {
+  if (!cached || cached.v !== ROWS_V || Date.now() - cached.at > 10 * 60 * 1000) {
     await takeSlot();
     try {
       if (t.dead) return;
@@ -480,7 +505,7 @@ async function loadSection(a, s, i, t) {
       const data = await res.json();
 
       if (Array.isArray(data.rows) && (data.rows.length || !have)) {
-        const part = { at: Date.now(), rows: data.rows, sheet: data.sheet || "" };
+        const part = { v: ROWS_V, at: Date.now(), rows: data.rows, sheet: data.sheet || "" };
         t.parts[i] = part;
         if (data.rows.length) idb.set(cacheKey, part);
         buildRows(t, a);
@@ -635,18 +660,22 @@ function tone(r) {
 
 /* ---------------------------------------------------------------- rendering */
 function thumb(r, cls) {
-  const a = state.byKey[r.artist];
-  // a picture sitting in the row itself (art, tattoos, jewelry) beats the era's cover
-  const img = r.img != null && a && r.gid ? API + "/row-image?" + reqArtist(a) + "&gid=" + r.gid + "&i=" + r.img : coverUrl(r.artist, r.era);
+  // the row's own picture (art, tattoos, jewelry) beats the era's cover
+  const own = rowPic(r), cover = coverUrl(r.artist, r.era);
+  const img = own || cover;
   const label = r.era || (r.tabs && r.tabs[0]) || r.artistName;
   return '<span class="thumb ' + (cls || "") + '" style="--h:' + hue(label) + '" data-a="' + esc(r.artist) + '" data-e="' + esc(r.era) + '">' + esc(initials(label)) +
-    (img ? '<img loading="lazy" decoding="async" alt="" src="' + esc(img) + '" onerror="coverFailed(this)">' : "") + "</span>";
+    (img ? '<img loading="lazy" decoding="async" referrerpolicy="no-referrer" alt="" src="' + esc(img) + '"' + (own && cover ? ' data-fb="' + esc(cover) + '"' : "") + ' onerror="coverFailed(this)">' : "") + "</span>";
 }
 
 // Google refuses some pictures when a page asks for dozens at once; one more
 // try a moment later usually gets it
 function coverFailed(img) {
-  if (img.dataset.retried) return img.remove();
+  if (img.dataset.retried) {
+    // the row's own picture would not load: the era's cover is better than nothing
+    if (img.dataset.fb) { const fb = img.dataset.fb; delete img.dataset.fb; img.src = fb; return; }
+    return img.remove();
+  }
   img.dataset.retried = "1";
   const src = img.getAttribute("src");
   setTimeout(() => { img.src = src + (src.includes("?") ? "&" : "?") + "retry=1"; }, 1500);
@@ -983,6 +1012,7 @@ function isSaved(r) { return state.saved.some(s => s.id === r.id); }
 function openDetail(r) {
   const a = state.byKey[r.artist];
   const sheetLink = r.sheet ? (r.row ? `${r.sheet}&range=A${r.row}` : r.sheet) : "";
+  const pic = rowPic(r);
   const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return url; } };
   const kv = [["Era", r.era], ["Type", r.type], ["Quality", r.quality], ["Available", r.available], ["Length", r.length], ["Date", r.date], ["Section", r.tabs.join(", ")]].concat(r.fields || [])
     .filter(p => String(p[1] || "").trim());
@@ -997,6 +1027,8 @@ function openDetail(r) {
       <button class="act" id="shareBtn">${ICON.share}Share</button>
     </div>
     ${r.notes ? `<div class="sec-h"><span>Notes</span></div><div class="notes">${hl(r.notes)}</div>` : ""}
+    ${r.tracklist ? `<div class="sec-h"><span>Tracklist</span></div><div class="notes">${hl(r.tracklist)}</div>` : ""}
+    ${pic ? `<button class="artbig" data-open="${esc(r.art && r.links[0] ? r.links[0] : pic)}"><img alt="" referrerpolicy="no-referrer" src="${esc(pic)}" onerror="this.parentNode.remove()"></button>` : ""}
     ${r.links.length ? `<div class="sec-h"><span>${r.links.length === 1 ? "Link" : "Links"}</span></div><div class="group plain lnk">${r.links.map(l => `<div class="row" style="padding-left:16px"><span class="body"><button class="rt" data-open="${esc(l)}"><div class="t">${esc(host(l))}</div><div class="s">${esc(l.replace(/^https?:\/\//, ""))}</div></button><button class="copy" data-copy="${esc(l)}">Copy</button></span></div>`).join("")}</div>` : ""}
     <div class="sec-h"><span>Details</span></div>
     <div class="group kv">${kv.map(p => `<div class="row"><span class="body">${p[0] ? `<span class="k">${esc(p[0])}</span>` : ""}<span class="v"${p[0] ? "" : ' style="text-align:left"'}>${esc(String(p[1]).replace(/\n+/g, " · "))}</span></span></div>`).join("")}</div>`;
@@ -1007,7 +1039,7 @@ function openDetail(r) {
     if (isSaved(r)) state.saved = state.saved.filter(s => s.id !== r.id);
     else {
       const keep = {};
-      ["id", "artist", "artistName", "era", "name", "title", "sub", "notes", "length", "type", "quality", "available", "date", "links", "row", "play", "tabs", "gid", "sheet", "q1", "a1", "t1", "g", "fields", "img", "body"].forEach(k => { keep[k] = r[k]; });
+      ["id", "artist", "artistName", "era", "name", "title", "sub", "notes", "length", "type", "quality", "available", "date", "links", "row", "play", "tabs", "gid", "sheet", "q1", "a1", "t1", "g", "fields", "img", "body", "art", "tracklist"].forEach(k => { keep[k] = r[k]; });
       state.saved.unshift(keep);
     }
     LS.set("saved", state.saved);
