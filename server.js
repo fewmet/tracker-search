@@ -3172,6 +3172,9 @@ function findImgurMediaUrl(html, id) {
   return match ? match[0] : null;
 }
 
+// GET /media?u=<link> - a tracker's file, piped so the page can play it in place
+require("./media")(app, { isDirectFileHost, directFileLink, getDriveId });
+
 app.use(express.static(path.join(__dirname, "public")));
 
 app.listen(PORT, () => {

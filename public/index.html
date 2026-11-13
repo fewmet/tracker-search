@@ -238,6 +238,28 @@
   .switch.on::after { transform: translateX(20px); }
   .hero h2 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .hero h2.long { font-size: 17px; }
+
+  /* ---------- media in a row's sheet ---------- */
+  .media { display: block; width: calc(100% - 32px); margin: 14px 16px 0; border-radius: 12px; overflow: hidden; background: var(--cell); position: relative; }
+  .media iframe { display: block; width: 100%; height: 100%; border: 0; }
+  .media.frame { background: #000; }
+  .media video { display: none; width: 100%; max-height: 62vh; background: #000; }
+  .media.vid video { display: block; }
+  .media.vid .pl { display: none; }
+  .pl { display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; }
+  .pp { flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--tint); color: #fff; display: grid; place-items: center; transition: transform .12s; }
+  .pp:active { transform: scale(.92); }
+  .pp svg { width: 22px; height: 22px; }
+  .pmid { flex: 1; min-width: 0; }
+  .seek { display: block; width: 100%; height: 22px; margin: 0; accent-color: var(--tint); cursor: pointer; touch-action: none; }
+  .ptime { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--label-2); font-variant-numeric: tabular-nums; }
+  .ptime .pname { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .media.busy .pp { animation: pulse 1.2s ease-in-out infinite; }
+  .mcard { height: 132px; background: #1c1c1e center/cover; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 15px; font-weight: 600; text-align: center; }
+  .mcard:active { opacity: .75; }
+  .mcard i { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.22); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); display: grid; place-items: center; }
+  .mcard i svg { width: 22px; height: 22px; }
+  .mcard small { display: block; font-size: 12px; font-weight: 400; opacity: .75; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -349,6 +371,7 @@ const ICON = {
   clock: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="10" r="7.3"/><path d="M10 5.8V10l2.8 1.8"/></svg>',
   globe: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="10" r="7.3"/><path d="M2.7 10h14.6M10 2.7c2.4 2.2 2.4 12.4 0 14.6M10 2.7c-2.4 2.2-2.4 12.4 0 14.6"/></svg>',
   play: '<svg viewBox="0 0 22 22" fill="currentColor"><path d="M7 4.3v13.4c0 .8.9 1.3 1.6.8l10-6.7c.6-.4.6-1.2 0-1.6l-10-6.7C7.900 3 7 3.500 7 4.300z"/></svg>',
+  pause: '<svg viewBox="0 0 22 22" fill="currentColor"><rect x="5" y="4" width="4.4" height="14" rx="1.2"/><rect x="12.6" y="4" width="4.4" height="14" rx="1.2"/></svg>',
   link: '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M9.300 12.700a3.800 3.800 0 005.400 0l3.200-3.200a3.800 3.800 0 00-5.400-5.400l-1 1"/><path d="M12.700 9.300a3.800 3.800 0 00-5.400 0l-3.200 3.200a3.800 3.800 0 005.400 5.400l1-1"/></svg>',
   star: '<svg viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M11 3l2.400 5 5.500.700-4 3.800 1 5.500-4.900-2.700L6.100 18l1-5.500-4-3.800 5.500-.700z"/></svg>',
   starOn: '<svg viewBox="0 0 22 22" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M11 3l2.400 5 5.500.700-4 3.800 1 5.500-4.900-2.700L6.100 18l1-5.500-4-3.800 5.500-.700z"/></svg>',
@@ -959,6 +982,7 @@ function renderSaved() {
 /* ---------------------------------------------------------------- sheets */
 let sheetOpen = false;
 function openSheet({ title, body, tall, left, onLeft }) {
+  stopMedia();
   $("#sheetTitle").textContent = title || "";
   $("#sheetBody").innerHTML = body;
   $("#sheetBody").scrollTop = 0;
@@ -976,6 +1000,7 @@ function closeSheet() {
   $("#sheet").classList.remove("on", "drag");
   $("#backdrop").classList.remove("on");
   sheetOpen = false;
+  stopMedia();
 }
 
 // the tracker's own glossary: what "Snippet", "OG File", "ref." and the rest mean
@@ -1007,6 +1032,195 @@ async function openKey() {
   }
 }
 
+/* ---------------------------------------------------------------- media */
+/*
+  What a link in a row can do inside the app:
+    file   a song or video file - played here, through the server where the
+           tracker links a page about the file rather than the file
+    frame  a page with a player of its own (YouTube, SoundCloud...) - embedded
+    card   somewhere that will not play inside another page (X, Instagram and
+           TikTok posts mostly come up broken when embedded) - a tile that opens it
+  Anything else (articles, pictures, the sheet itself) stays a plain link.
+*/
+const FILE_EXT = /\.(mp3|m4a|m4b|aac|alac|wav|flac|ogg|oga|opus|aiff?|wma|caf|mp4|m4v|mov|webm)$/i;
+const VIDEO_EXT = /\.(mp4|m4v|mov|webm)$/i;
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif|avif|bmp|svg)$/i;
+const SITE_NAMES = {
+  "youtube.com": "YouTube", "youtu.be": "YouTube", "soundcloud.com": "SoundCloud", "snd.sc": "SoundCloud", "spotify.com": "Spotify",
+  "apple.com": "Apple Music", "vimeo.com": "Vimeo", "twitter.com": "X", "x.com": "X", "instagram.com": "Instagram", "tiktok.com": "TikTok",
+  "twitch.tv": "Twitch", "streamable.com": "Streamable", "google.com": "Google Drive", "mega.nz": "MEGA", "krakenfiles.com": "Krakenfiles",
+  "pillows.su": "Pillows", "pixeldrain.com": "Pixeldrain", "archive.org": "Internet Archive", "tidal.com": "TIDAL", "deezer.com": "Deezer",
+  "audiomack.com": "Audiomack", "bandcamp.com": "Bandcamp", "facebook.com": "Facebook", "dropbox.com": "Dropbox", "mediafire.com": "MediaFire",
+  "imgur.gg": "imgur.gg", "exoshare.org": "Exoshare", "kick.com": "Kick", "dailymotion.com": "Dailymotion", "reddit.com": "Reddit", "froste.lol": "Froste"
+};
+// places that hold songs and videos but only play them on their own pages
+const CARD_HOSTS = ["mega.nz", "mega.co.nz", "krakenfiles.com", "froste.lol", "tidal.com", "deezer.com", "audiomack.com", "bandcamp.com", "facebook.com", "fb.watch",
+  "dropbox.com", "mediafire.com", "gofile.io", "kick.com", "dailymotion.com", "soundcloud.com", "snd.sc", "spotify.com", "youtube.com", "tiktok.com", "instagram.com",
+  "twitch.tv", "vimeo.com", "twitter.com", "x.com", "onlyfiles.cc", "buzzheavier.com", "we.tl", "wetransfer.com", "v.redd.it", "music.amazon.com"];
+
+function mediaOf(link, playable) {
+  let u;
+  try { u = new URL(link); } catch (e) { return null; }
+  if (!/^https?:$/.test(u.protocol)) return null;
+
+  const host = u.hostname.toLowerCase().replace(/^(www|m|mobile)\./, ""), path = u.pathname, seg = path.split("/").filter(Boolean);
+  const on = (...names) => names.some(n => host === n || host.endsWith("." + n));
+  const known = Object.keys(SITE_NAMES).find(n => on(n));
+  const site = known ? SITE_NAMES[known] : host;
+  const frame = (src, size) => ({ kind: "frame", src, size: size || 0, link, site });
+  const card = () => ({ kind: "card", link, site });
+  const viaServer = alt => ({ kind: "file", src: API + "/media?u=" + encodeURIComponent(link), served: true, video: VIDEO_EXT.test(path), link, site, alt });
+
+  if (IMAGE_EXT.test(path)) return null;
+
+  if (on("youtube.com", "youtu.be", "youtube-nocookie.com")) {
+    const id = host === "youtu.be" ? seg[0] : u.searchParams.get("v") || (/^(shorts|live|embed|v)$/.test(seg[0]) ? seg[1] : "");
+    const list = u.searchParams.get("list");
+    const t = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(u.searchParams.get("t") || u.searchParams.get("start") || "");
+    const start = t ? (Number(t[1]) || 0) * 3600 + (Number(t[2]) || 0) * 60 + (Number(t[3]) || 0) : 0;
+    if (id && /^[\w-]{6,20}$/.test(id)) return frame("https://www.youtube-nocookie.com/embed/" + id + "?playsinline=1&rel=0" + (start ? "&start=" + start : "") + (list ? "&list=" + encodeURIComponent(list) : ""));
+    if (list) return frame("https://www.youtube-nocookie.com/embed/videoseries?playsinline=1&list=" + encodeURIComponent(list));
+    return card();
+  }
+  if (on("vimeo.com")) { const id = seg.find(x => /^\d{5,}$/.test(x)); return id ? frame("https://player.vimeo.com/video/" + id) : card(); }
+  if (host === "soundcloud.com" && seg.length >= 2) {
+    return frame("https://w.soundcloud.com/player/?url=" + encodeURIComponent(u.origin + path + u.search) + "&color=%23007aff&show_teaser=false&hide_related=true&visual=false", seg[1] === "sets" ? 400 : 166);
+  }
+  if (host === "open.spotify.com") {
+    const at = seg.findIndex(x => /^(track|album|playlist|episode|show|artist)$/.test(x));
+    return at >= 0 && seg[at + 1] ? frame("https://open.spotify.com/embed/" + seg[at] + "/" + seg[at + 1], /track|episode/.test(seg[at]) ? 152 : 352) : card();
+  }
+  if (host === "music.apple.com") return frame("https://embed.music.apple.com" + path + u.search, u.searchParams.get("i") || seg.includes("song") ? 175 : 450);
+  if (on("streamable.com") && seg.length === 1) return frame("https://streamable.com/e/" + seg[0]);
+  if (on("twitch.tv")) {
+    const parent = "&parent=" + encodeURIComponent(location.hostname) + "&autoplay=false";
+    const clip = host === "clips.twitch.tv" ? seg[0] : seg[1] === "clip" ? seg[2] : "";
+    if (clip && clip !== "embed") return frame("https://clips.twitch.tv/embed?clip=" + encodeURIComponent(clip) + parent);
+    if (seg[0] === "videos" && seg[1]) return frame("https://player.twitch.tv/?video=" + encodeURIComponent(seg[1]) + parent);
+    return card();
+  }
+
+  if (on("drive.google.com", "drive.usercontent.google.com")) {
+    if (seg.includes("folders")) return card();
+    const d = /\/d\/([\w-]{10,})/.exec(path), id = d ? d[1] : u.searchParams.get("id");
+    // if the file will not come through the server, Drive's own preview still plays it
+    return id ? viaServer(frame("https://drive.google.com/file/d/" + id + "/preview")) : card();
+  }
+  if (on("google.com", "web.archive.org")) return null;
+
+  if (on("pillows.su")) return /[a-f0-9]{32}/i.test(link) ? viaServer() : card();
+  if (on("exoshare.org")) return /\/(share|s|api\/shares)\//i.test(path) ? viaServer() : card();
+  if (on("pixeldrain.com")) return /^\/(u|api\/file)\//i.test(path) ? viaServer() : card();
+  if (on("imgur.gg")) return host !== "imgur.gg" || seg[0] === "f" ? viaServer() : card();
+  if (on("catbox.moe", "bleed.bot", "fileditchfiles.me", "cdn.discordapp.com", "media.discordapp.net")) return viaServer();
+  if (on("archive.org")) return FILE_EXT.test(path) && /^(details|download)$/.test(seg[0]) ? viaServer() : playable ? card() : null;
+
+  if (FILE_EXT.test(path)) return { kind: "file", src: link, video: VIDEO_EXT.test(path), link, site };
+  if (on(...CARD_HOSTS) || playable) return card();
+  return null;
+}
+
+const clock = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s % 60).padStart(2, "0"); };
+
+function mediaHtml(m, i, r) {
+  if (m.kind === "frame") {
+    return '<div class="media frame" data-m="' + i + '" style="' + (m.size ? "height:" + m.size + "px" : "aspect-ratio:16/9") + '"><iframe loading="lazy" src="' + esc(m.src) + '" title="' + esc(m.site) +
+      '" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"' + "></iframe></div>";
+  }
+  if (m.kind === "file") {
+    return '<div class="media file' + (m.video ? " vid" : "") + '" data-m="' + i + '"><video playsinline webkit-playsinline preload="' + (i === 0 || m.video ? "metadata" : "none") + '"' + (m.video ? " controls" : "") +
+      ' src="' + esc(m.src) + '"></video><div class="pl"><button class="pp" aria-label="Play">' + ICON.play + '</button><div class="pmid"><input class="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek">' +
+      '<div class="ptime"><span class="cur">0:00</span><span class="pname">' + esc(m.site) + '</span><span class="dur"></span></div></div></div></div>';
+  }
+  const pic = r ? rowPic(r) || coverUrl(r.artist, r.era) : "";
+  const where = m.link.replace(/^https?:\/\/(www\.)?/, "");
+  return '<button class="media mcard" data-m="' + i + '" data-open="' + esc(m.link) + '"' +
+    (pic ? ' style="background-image:linear-gradient(rgba(0,0,0,.5),rgba(0,0,0,.62)),url(' + esc(encodeURI(decodeURI(pic)).replace(/[()']/g, c => "%" + c.charCodeAt(0).toString(16))) + ')"' : "") +
+    "><i>" + ICON.play + "</i><span>Play on " + esc(m.site) + "<small>" + esc(where) + "</small></span></button>";
+}
+
+// every link of a row that can be played, embedded or at least pointed at
+function rowMedia(r) {
+  const seen = new Set(), out = [];
+  if (r.art) return out;   // an Art row's links are its picture
+  (r.links || []).forEach((l, at) => {
+    const m = mediaOf(l, Boolean(r.play) && at === 0);
+    if (!m || seen.has(m.src || m.link) || out.length >= 6) return;
+    seen.add(m.src || m.link);
+    out.push(m);
+  });
+  return out;
+}
+
+function wireMedia(items, r) {
+  items.forEach((m, i) => {
+    const box = $('#sheetBody .media[data-m="' + i + '"]');
+    if (!box || m.kind !== "file") return;
+
+    const v = box.querySelector("video"), pp = box.querySelector(".pp"), seek = box.querySelector(".seek");
+    const cur = box.querySelector(".cur"), dur = box.querySelector(".dur"), name = box.querySelector(".pname");
+    let wanted = false, broken = false, retried = false, dragging = false;
+    const length = () => (isFinite(v.duration) && v.duration > 0 ? v.duration : 0);
+    const paint = () => { pp.innerHTML = v.paused ? ICON.play : ICON.pause; pp.setAttribute("aria-label", v.paused ? "Play" : "Pause"); };
+    const busy = on => box.classList.toggle("busy", on);
+
+    // it would not play: try the server's converter once, then hand over to the site
+    const giveUp = () => {
+      if (!box.isConnected) return;
+      v.removeAttribute("src"); try { v.load(); } catch (e) {}
+      box.insertAdjacentHTML("afterend", mediaHtml(m.alt || { kind: "card", link: m.link, site: m.site }, i, r));
+      box.remove();
+    };
+    const convert = () => {
+      retried = true; broken = false; busy(true);
+      name.textContent = "Converting…";
+      v.src = m.src + "&convert=1";
+      v.play().catch(() => {});
+    };
+
+    pp.onclick = () => {
+      wanted = true;
+      if (broken) return m.served && !retried ? convert() : giveUp();
+      if (v.paused) { busy(v.readyState < 3); v.play().catch(() => {}); } else v.pause();
+    };
+    v.addEventListener("play", () => {
+      wanted = true;
+      document.querySelectorAll("#sheetBody video").forEach(o => { if (o !== v) o.pause(); });
+      paint();
+    });
+    v.addEventListener("pause", () => { paint(); busy(false); });
+    v.addEventListener("waiting", () => busy(true));
+    v.addEventListener("playing", () => { busy(false); name.textContent = m.site; });
+    v.addEventListener("canplay", () => busy(false));
+    v.addEventListener("ended", paint);
+    v.addEventListener("loadedmetadata", () => {
+      if (v.videoWidth && v.videoHeight) { box.classList.add("vid"); v.controls = true; }
+      dur.textContent = length() ? clock(length()) : "";
+    });
+    v.addEventListener("durationchange", () => { dur.textContent = length() ? clock(length()) : ""; });
+    v.addEventListener("timeupdate", () => {
+      if (dragging) return;
+      cur.textContent = clock(v.currentTime);
+      if (length()) seek.value = Math.round(v.currentTime / length() * 1000);
+    });
+    seek.addEventListener("input", () => { dragging = true; if (length()) cur.textContent = clock(seek.value / 1000 * length()); });
+    seek.addEventListener("change", () => { dragging = false; if (length()) v.currentTime = seek.value / 1000 * length(); });
+    v.addEventListener("error", () => {
+      if (!v.getAttribute("src")) return;
+      busy(false);
+      if (!wanted) { broken = true; return; }       // nobody has pressed play yet: wait until they do
+      if (m.served && !retried) return convert();
+      giveUp();
+    });
+  });
+}
+
+// nothing keeps playing behind a sheet that has gone
+function stopMedia() {
+  document.querySelectorAll("#sheetBody video").forEach(v => { try { v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} });
+  document.querySelectorAll("#sheetBody .media iframe").forEach(f => { f.src = "about:blank"; });
+}
+
 function isSaved(r) { return state.saved.some(s => s.id === r.id); }
 
 function openDetail(r) {
@@ -1014,6 +1228,7 @@ function openDetail(r) {
   const sheetLink = r.sheet ? (r.row ? `${r.sheet}&range=A${r.row}` : r.sheet) : "";
   const pic = rowPic(r);
   const host = url => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (e) { return url; } };
+  const media = rowMedia(r);
   const kv = [["Era", r.era], ["Type", r.type], ["Quality", r.quality], ["Available", r.available], ["Length", r.length], ["Date", r.date], ["Section", r.tabs.join(", ")]].concat(r.fields || [])
     .filter(p => String(p[1] || "").trim());
 
@@ -1026,6 +1241,7 @@ function openDetail(r) {
       ${sheetLink ? `<button class="act" data-open="${esc(sheetLink)}">${ICON.sheet}Sheet</button>` : ""}
       <button class="act" id="shareBtn">${ICON.share}Share</button>
     </div>
+    ${media.map((m, i) => mediaHtml(m, i, r)).join("")}
     ${r.notes ? `<div class="sec-h"><span>Notes</span></div><div class="notes">${hl(r.notes)}</div>` : ""}
     ${r.tracklist ? `<div class="sec-h"><span>Tracklist</span></div><div class="notes">${hl(r.tracklist)}</div>` : ""}
     ${pic ? `<button class="artbig" data-open="${esc(r.art && r.links[0] ? r.links[0] : pic)}"><img alt="" referrerpolicy="no-referrer" src="${esc(pic)}" onerror="this.parentNode.remove()"></button>` : ""}
@@ -1034,6 +1250,7 @@ function openDetail(r) {
     <div class="group kv">${kv.map(p => `<div class="row"><span class="body">${p[0] ? `<span class="k">${esc(p[0])}</span>` : ""}<span class="v"${p[0] ? "" : ' style="text-align:left"'}>${esc(String(p[1]).replace(/\n+/g, " · "))}</span></span></div>`).join("")}</div>`;
 
   openSheet({ title: "", body, tall: true });
+  wireMedia(media, r);
 
   $("#saveBtn").onclick = () => {
     if (isSaved(r)) state.saved = state.saved.filter(s => s.id !== r.id);
