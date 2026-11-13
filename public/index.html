@@ -260,6 +260,30 @@
   .mcard i { width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.22); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); display: grid; place-items: center; }
   .mcard i svg { width: 22px; height: 22px; }
   .mcard small { display: block; font-size: 12px; font-weight: 400; opacity: .75; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- volume, and the mini player that outlives the sheet ---------- */
+  .media.frame { background: var(--cell); }
+  .fr { background: #000; }
+  .media.vid .pl { display: flex; }
+  .media.vid .pp, .media.vid .pmid { display: none; }
+  .pvol { flex: none; width: 92px; display: flex; align-items: center; gap: 6px; color: var(--label-2); }
+  .pvol svg { flex: none; width: 18px; height: 18px; }
+  .vol { flex: 1; min-width: 0; height: 22px; margin: 0; accent-color: var(--tint); cursor: pointer; touch-action: none; }
+  .media.vid .pvol, .media.frame .pvol { flex: 1; width: auto; }
+  .dock { position: absolute; z-index: 6; left: 8px; right: 8px; bottom: calc(58px + var(--safe-b)); border-radius: 14px; background: var(--cell); box-shadow: 0 10px 30px rgba(0,0,0,.3), 0 0 0 .5px var(--sep); overflow: hidden; }
+  .dock.video { left: auto; width: 250px; }
+  .dock-head { display: flex; align-items: center; gap: 8px; padding: 8px 8px 6px 12px; }
+  .dock-t { flex: 1; min-width: 0; }
+  .dock-t .t { font-size: 14px; font-weight: 600; }
+  .dock-t .s { font-size: 12px; margin: 0; }
+  .dock-x { flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--fill); color: var(--label-2); display: grid; place-items: center; }
+  .dock-x svg { width: 10px; height: 10px; }
+  .dock-x:active { background: var(--fill-2); }
+  .dock .media { width: 100%; margin: 0; border-radius: 0; background: none; }
+  .dock .pl { padding: 0 12px 10px 10px; }
+  .dock .pp { width: 38px; height: 38px; }
+  .dock .media.vid .pl, .dock .media.frame .pl { padding: 6px 12px; }
+  .dock:not([hidden]) ~ .toast { bottom: calc(200px + var(--safe-b)); }
 </style>
 </head>
 <body>
@@ -322,6 +346,10 @@
       <div class="sheet-bar"><button class="side" id="sheetLeft"></button><h3 id="sheetTitle"></h3><button class="side r" id="sheetDone">Done</button></div>
     </div>
     <div class="sheet-body" id="sheetBody"></div>
+  </div>
+  <div class="dock" id="dock" hidden>
+    <div class="dock-head"><button class="dock-t" id="dockOpen"><div class="t" id="dockTitle"></div><div class="s" id="dockSub"></div></button><button class="dock-x" id="dockX" aria-label="Stop and close"><svg viewBox="0 0 10 10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l6 6M8 2l-6 6"/></svg></button></div>
+    <div id="dockSlot"></div>
   </div>
   <div class="toast" id="toast"></div>
 </div>
@@ -395,7 +423,7 @@ const keys = {};              // artist key -> the glossary read from it
 const KEY_TAB = /(^|[^a-z])key([^a-z]|$)/i;
 const ART_TAB = /(^|[^a-z])art(work)?s?([^a-z]|$)/i;   // a tab whose rows each link to a picture
 const TRACKLIST_COL = /^track ?list/i;
-const ROWS_V = 2;             // bumped when the server starts sending more per row
+const ROWS_V = 3;             // bumped when the server starts sending more per row
 let view = [], shown = 0, tokens = [], sheetRows = null;
 
 /* ---------------------------------------------------------------- loading */
@@ -1122,15 +1150,60 @@ function mediaOf(link, playable) {
 
 const clock = s => { s = Math.max(0, Math.floor(s || 0)); const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60); return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(s % 60).padStart(2, "0"); };
 
+/* one volume for everything that plays, kept between visits */
+const VOL_ICON = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.6h2.4l3.7-3v10.8l-3.700-3H3z" fill="currentColor"/><path d="M12.6 7.400a3.700 3.700 0 010 5.200M14.900 5.200a6.800 6.800 0 010 9.600"/></svg>';
+const volume = () => { const x = Number(LS.get("vol", 1)); return x >= 0 && x <= 1 ? x : 1; };
+const volHtml = () => '<label class="pvol">' + VOL_ICON + '<input class="vol" type="range" min="0" max="100" step="1" value="' + Math.round(volume() * 100) + '" aria-label="Volume"></label>';
+
+function setVolume(x) {
+  x = Math.min(1, Math.max(0, Number(x) || 0));
+  LS.set("vol", x);
+  document.querySelectorAll(".vol").forEach(el => { if (document.activeElement !== el) el.value = Math.round(x * 100); });
+  document.querySelectorAll(".media video").forEach(v => { if (v.muted && x > 0) v.muted = false; if (Math.abs(v.volume - x) > .004) v.volume = x; });
+  document.querySelectorAll(".media.yt iframe").forEach(f => { ytSend(f, "setVolume", [Math.round(x * 100)]); if (x > 0) ytSend(f, "unMute"); });
+}
+document.addEventListener("input", e => { if (e.target.classList && e.target.classList.contains("vol")) setVolume(e.target.value / 100); });
+
+/* a YouTube player reports what it is doing, and takes orders, by message */
+const YT = "https://www.youtube-nocookie.com";
+const ytState = new WeakMap();   // iframe -> { state, time }
+function ytPost(f, data) { try { f.contentWindow.postMessage(JSON.stringify(data), YT); } catch (e) {} }
+function ytSend(f, func, args) { ytPost(f, { event: "command", func, args: args || [] }); }
+function ytListen(f) {
+  ytPost(f, { event: "listening", id: 1, channel: "widget" });
+  ytSend(f, "addEventListener", ["onStateChange"]);
+  ytSend(f, "setVolume", [Math.round(volume() * 100)]);
+}
+window.addEventListener("message", e => {
+  if (e.origin !== YT) return;
+  let d;
+  try { d = typeof e.data === "string" ? JSON.parse(e.data) : e.data; } catch (err) { return; }
+  const f = [...document.querySelectorAll(".media.yt iframe")].find(x => x.contentWindow === e.source);
+  if (!f || !d) return;
+
+  const s = ytState.get(f) || {};
+  ytState.set(f, s);
+  if (d.event === "onStateChange") s.state = Number(d.info);
+  else if (d.info && typeof d.info === "object") {
+    if (d.info.playerState != null) s.state = d.info.playerState;
+    if (d.info.currentTime != null) s.time = d.info.currentTime;
+  }
+  const playing = s.state === 1;
+  if (playing && !s.was) nowPlaying(f.closest(".media"));
+  s.was = playing;
+});
+
 function mediaHtml(m, i, r) {
   if (m.kind === "frame") {
-    return '<div class="media frame" data-m="' + i + '" style="' + (m.size ? "height:" + m.size + "px" : "aspect-ratio:16/9") + '"><iframe loading="lazy" src="' + esc(m.src) + '" title="' + esc(m.site) +
-      '" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"' + "></iframe></div>";
+    const yt = m.src.indexOf(YT + "/embed/") === 0;
+    const src = yt ? m.src + "&enablejsapi=1&origin=" + encodeURIComponent(location.origin) : m.src;
+    return '<div class="media frame' + (yt ? " yt" : "") + '" data-m="' + i + '"><div class="fr" style="' + (m.size ? "height:" + m.size + "px" : "aspect-ratio:16/9") + '"><iframe loading="lazy" src="' + esc(src) + '" title="' + esc(m.site) +
+      '" allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' + (yt ? '<div class="pl">' + volHtml() + "</div>" : "") + "</div>";
   }
   if (m.kind === "file") {
     return '<div class="media file' + (m.video ? " vid" : "") + '" data-m="' + i + '"><video playsinline webkit-playsinline preload="' + (i === 0 || m.video ? "metadata" : "none") + '"' + (m.video ? " controls" : "") +
       ' src="' + esc(m.src) + '"></video><div class="pl"><button class="pp" aria-label="Play">' + ICON.play + '</button><div class="pmid"><input class="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Seek">' +
-      '<div class="ptime"><span class="cur">0:00</span><span class="pname">' + esc(m.site) + '</span><span class="dur"></span></div></div></div></div>';
+      '<div class="ptime"><span class="cur">0:00</span><span class="pname">' + esc(m.site) + '</span><span class="dur"></span></div></div>' + volHtml() + "</div></div>";
   }
   const pic = r ? rowPic(r) || coverUrl(r.artist, r.era) : "";
   const where = m.link.replace(/^https?:\/\/(www\.)?/, "");
@@ -1155,7 +1228,16 @@ function rowMedia(r) {
 function wireMedia(items, r) {
   items.forEach((m, i) => {
     const box = $('#sheetBody .media[data-m="' + i + '"]');
-    if (!box || m.kind !== "file") return;
+    if (!box || box._wired) return;
+    box._wired = true; box._row = r; box._m = m;
+
+    if (box.classList.contains("yt")) {
+      const f = box.querySelector("iframe");
+      // it is not always ready to listen the moment it has loaded
+      f.addEventListener("load", () => { if (f.src.indexOf(YT) !== 0) return; ytState.delete(f); ytListen(f); setTimeout(() => ytListen(f), 1200); setTimeout(() => ytListen(f), 3000); });
+      return;
+    }
+    if (m.kind !== "file") return;
 
     const v = box.querySelector("video"), pp = box.querySelector(".pp"), seek = box.querySelector(".seek");
     const cur = box.querySelector(".cur"), dur = box.querySelector(".dur"), name = box.querySelector(".pname");
@@ -1164,12 +1246,16 @@ function wireMedia(items, r) {
     const paint = () => { pp.innerHTML = v.paused ? ICON.play : ICON.pause; pp.setAttribute("aria-label", v.paused ? "Play" : "Pause"); };
     const busy = on => box.classList.toggle("busy", on);
 
+    v.volume = volume();
+
     // it would not play: try the server's converter once, then hand over to the site
     const giveUp = () => {
+      if (docked && docked.box === box) return closeDock();
       if (!box.isConnected) return;
       v.removeAttribute("src"); try { v.load(); } catch (e) {}
       box.insertAdjacentHTML("afterend", mediaHtml(m.alt || { kind: "card", link: m.link, site: m.site }, i, r));
       box.remove();
+      wireMedia(items.map((x, at) => (at === i && m.alt ? m.alt : x)), r);
     };
     const convert = () => {
       retried = true; broken = false; busy(true);
@@ -1183,18 +1269,15 @@ function wireMedia(items, r) {
       if (broken) return m.served && !retried ? convert() : giveUp();
       if (v.paused) { busy(v.readyState < 3); v.play().catch(() => {}); } else v.pause();
     };
-    v.addEventListener("play", () => {
-      wanted = true;
-      document.querySelectorAll("#sheetBody video").forEach(o => { if (o !== v) o.pause(); });
-      paint();
-    });
+    v.addEventListener("play", () => { wanted = true; nowPlaying(box); paint(); });
     v.addEventListener("pause", () => { paint(); busy(false); });
     v.addEventListener("waiting", () => busy(true));
     v.addEventListener("playing", () => { busy(false); name.textContent = m.site; });
     v.addEventListener("canplay", () => busy(false));
     v.addEventListener("ended", paint);
+    v.addEventListener("volumechange", () => { if (!v.muted && Math.abs(v.volume - volume()) > .004) setVolume(v.volume); });
     v.addEventListener("loadedmetadata", () => {
-      if (v.videoWidth && v.videoHeight) { box.classList.add("vid"); v.controls = true; }
+      if (v.videoWidth && v.videoHeight) { box.classList.add("vid"); v.controls = true; if (docked && docked.box === box) $("#dock").classList.add("video"); }
       dur.textContent = length() ? clock(length()) : "";
     });
     v.addEventListener("durationchange", () => { dur.textContent = length() ? clock(length()) : ""; });
@@ -1215,10 +1298,98 @@ function wireMedia(items, r) {
   });
 }
 
-// nothing keeps playing behind a sheet that has gone
+/* ---------------------------------------------------------------- mini player */
+/*
+  Whatever is playing when its sheet goes away is not stopped: its player is
+  lifted out of the sheet into a small window above the tab bar - a picture for
+  a video, a bar with the same controls for a song - and plays on while the
+  tracker is searched. Starting anything else replaces it; its X stops it.
+*/
+let docked = null;   // { box, row }
+
+function killMedia(box) {
+  box.querySelectorAll("video").forEach(v => { try { v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} });
+  box.querySelectorAll("iframe").forEach(f => { f.src = "about:blank"; });
+}
+
+function isPlaying(box) {
+  const v = box.querySelector("video");
+  if (v) return Boolean(v.getAttribute("src")) && !v.paused && !v.ended;
+  const f = box.querySelector("iframe"), s = f && ytState.get(f);
+  return Boolean(s && (s.state === 1 || s.state === 3));
+}
+
+// moved in one step where the browser can, so an embedded player carries on;
+// otherwise the embed starts again from where it had got to
+function moveBox(box, parent, before) {
+  const f = box.querySelector("iframe"), v = box.querySelector("video");
+  const playing = isPlaying(box);
+
+  if (typeof parent.moveBefore === "function") {
+    try { parent.moveBefore(box, before || null); return; } catch (e) {}
+  }
+  if (f && playing) {
+    const at = Math.floor((ytState.get(f) || {}).time || 0);
+    f.setAttribute("src", f.src.replace(/&(start|autoplay)=\d+/g, "") + "&autoplay=1&start=" + at);
+  }
+  parent.insertBefore(box, before || null);
+  if (v && playing && v.paused) v.play().catch(() => {});
+}
+
+// only one thing plays at a time
+function nowPlaying(box) {
+  document.querySelectorAll(".media").forEach(other => {
+    if (other === box) return;
+    other.querySelectorAll("video").forEach(v => v.pause());
+    if (other.classList.contains("yt")) other.querySelectorAll("iframe").forEach(f => ytSend(f, "pauseVideo"));
+  });
+  if (docked && docked.box !== box) closeDock();
+}
+
+function dockPlaying() {
+  const box = [...document.querySelectorAll("#sheetBody .media.file, #sheetBody .media.yt")].find(b => b._row && isPlaying(b));
+  if (!box) return;
+  closeDock();
+
+  // the sheet keeps its shape while it slides away
+  const gap = document.createElement("div");
+  gap.className = "media";
+  gap.style.height = box.offsetHeight + "px";
+  box.parentNode.insertBefore(gap, box);
+
+  docked = { box, row: box._row };
+  $("#dockTitle").textContent = box._row.title || "";
+  $("#dockSub").textContent = [box._row.artistName, box._row.era].filter(Boolean).join(" · ");
+  $("#dock").classList.toggle("video", box.classList.contains("vid") || box.classList.contains("yt"));
+  $("#dock").hidden = false;
+  moveBox(box, $("#dockSlot"), null);
+}
+
+function closeDock(keep) {
+  if (!docked) return;
+  const box = docked.box;
+  docked = null;
+  $("#dock").hidden = true;
+  if (!keep) { killMedia(box); box.remove(); }
+}
+
+// reopening the row that is in the mini player puts its player back in the sheet
+function undock(r, items) {
+  if (!docked || docked.row.id !== r.id) return;
+  const i = items.findIndex(m => m.src === docked.box._m.src);
+  const fresh = i < 0 ? null : $('#sheetBody .media[data-m="' + i + '"]');
+  if (!fresh) return;
+  const box = docked.box;
+  closeDock(true);
+  killMedia(fresh);
+  moveBox(box, fresh.parentNode, fresh);
+  fresh.remove();
+}
+
+// what is playing moves to the mini player; nothing else is left running behind a sheet that has gone
 function stopMedia() {
-  document.querySelectorAll("#sheetBody video").forEach(v => { try { v.pause(); v.removeAttribute("src"); v.load(); } catch (e) {} });
-  document.querySelectorAll("#sheetBody .media iframe").forEach(f => { f.src = "about:blank"; });
+  dockPlaying();
+  document.querySelectorAll("#sheetBody .media").forEach(killMedia);
 }
 
 function isSaved(r) { return state.saved.some(s => s.id === r.id); }
@@ -1250,6 +1421,7 @@ function openDetail(r) {
     <div class="group kv">${kv.map(p => `<div class="row"><span class="body">${p[0] ? `<span class="k">${esc(p[0])}</span>` : ""}<span class="v"${p[0] ? "" : ' style="text-align:left"'}>${esc(String(p[1]).replace(/\n+/g, " · "))}</span></span></div>`).join("")}</div>`;
 
   openSheet({ title: "", body, tall: true });
+  undock(r, media);
   wireMedia(media, r);
 
   $("#saveBtn").onclick = () => {
@@ -1465,6 +1637,8 @@ $("#sheetBody").addEventListener("click", e => {
   }
 });
 
+$("#dockX").addEventListener("click", () => closeDock());
+$("#dockOpen").addEventListener("click", () => { if (docked) openDetail(docked.row); });
 $("#sheetDone").addEventListener("click", closeSheet);
 $("#backdrop").addEventListener("click", closeSheet);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && sheetOpen) closeSheet(); });

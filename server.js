@@ -1663,6 +1663,12 @@ async function loadSongs(artist, section) {
           link: getPlayableLink(originalLink)
         }, {
           rowLinks: { value: rowLinks },
+          // the columns nothing above reads (Source, Image, Leak Date...), so
+          // Tracker Search can show a row the way the sheet has it
+          extra: { value: headers.map((heading, at) => [String(heading || "").split("\n")[0].replace(/\s+/g, " ").trim().slice(0, 60), String(row[at] || "").trim().slice(0, 3000), at])
+            .filter(cell => cell[0] && cell[1] && !/^https?:\/\/\S+$/.test(cell[1]) && !/^n\/?a$/i.test(cell[1]) &&
+              ![eraIndex, nameIndex, notesIndex, tracklistIndex, lengthIndex, typeIndex, qualityIndex, availableLengthIndex, linkIndex, altLinkIndex, dateIndex].includes(cell[2]))
+            .map(cell => [cell[0], cell[1]]) },
           tracklist: { value: tracklistIndex >= 0 && tracklistIndex !== nameIndex ? row[tracklistIndex] || "" : "" },
           rowNumber: { value: rowNumber },
           rowIndex: { value: index }
@@ -1703,6 +1709,7 @@ async function loadSongs(artist, section) {
         available: first(song.availableLength),
         date: song.date,
         links: song.rowLinks,
+        fields: song.extra.length ? song.extra : undefined,
         row: song.rowNumber,
         play: isPlayableSong(song)
       }));
